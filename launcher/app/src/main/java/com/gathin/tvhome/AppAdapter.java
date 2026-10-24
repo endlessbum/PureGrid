@@ -189,9 +189,9 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
                     Drawable realIcon;
                     try {
                         realIcon = ri.loadIcon(pm);
-                    } catch (PackageManager.NameNotFoundException | Resources.NotFoundException ex) {
-                        // The package or its resources vanished between the query and this load;
-                        // the task just leaves the placeholder in place.
+                    } catch (Resources.NotFoundException ex) {
+                        // The resources vanished between the query and this load (the package was
+                        // removed mid-flight); the task just leaves the placeholder in place.
                         return;
                     }
                     if (realIcon != null) {
@@ -369,10 +369,10 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             }
         }
         // The last leg runs outside the try above: it re-asks the package for the banner, and the
-        // package can be gone by then. Null keeps the placeholder; the caller skips null loads.
+        // resources can be gone by then. Null keeps the placeholder; the caller skips null loads.
         try {
             return scaledBanner(ri.activityInfo.loadBanner(pm));
-        } catch (PackageManager.NameNotFoundException | Resources.NotFoundException ignored) {
+        } catch (Resources.NotFoundException ignored) {
             return null;
         }
     }
