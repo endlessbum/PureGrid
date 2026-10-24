@@ -1,6 +1,7 @@
 package com.gathin.tvhome;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -13,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -41,6 +43,11 @@ public class SearchActivity extends Activity {
 
     private final List<AppEntry> all = new ArrayList<>();
     private final List<AppEntry> shown = new ArrayList<>();
+    /** The pkg/activity components the current list was built from; onResume compares a fresh
+     *  query against it so the list is rebuilt only when the launcher set really changed. */
+    private final Set<String> listed = new HashSet<>();
+    /** The text the rows are filtered by; a rebuild (a launch that failed) keeps the query. */
+    private String query = "";
     private Adapter adapter;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private Drawable placeholder;
@@ -55,24 +62,7 @@ public class SearchActivity extends Activity {
         adapter = new Adapter();
         list.setAdapter(adapter);
         placeholder = getDrawable(R.drawable.ic_placeholder_banner);
-
-        PackageManager pm = getPackageManager();
-        // The same apps the grid shows: never the launcher itself, never hidden_apps.
-        Set<String> hidden = new HashSet<>(Config.load(this).hiddenApps);
-        Intent q = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
-        for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
-            ApplicationInfo ai = ri.activityInfo.applicationInfo;
-            String pkg = ai.packageName;
-            if (pkg.equals(getPackageName()) || hidden.contains(pkg)) continue;
-            String label = String.valueOf(ri.loadLabel(pm));
-            Intent launch = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-                    .setClassName(ri.activityInfo.packageName, ri.activityInfo.name)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            all.add(new AppEntry(label, pkg, launch, ri));
-        }
-        Collections.sort(all, (a, b) -> a.label.compareToIgnoreCase(b.label));
-        filter("");
-        loadIcons(pm);
+        buildApps();
         input.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             public void onTextChanged(CharSequence s, int st, int b, int c) { filter(s.toString()); }
@@ -84,6 +74,59 @@ public class SearchActivity extends Activity {
     protected void onDestroy() {
         executor.shutdown();
         super.onDestroy();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // The list is built once, but apps can be uninstalled or disabled while the search sat in
+        // the background — a row would then offer a launch that cannot succeed. Re-query and
+        // rebuild only when the visible launcher set actually changed.
+        Set<String> hidden = new HashSet<>(Config.load(this).hiddenApps);
+        Set<String> now = new HashSet<>();
+        for (ResolveInfo ri : getPackageManager().queryIntentActivities(
+                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)) {
+            String pkg = ri.activityInfo.applicationInfo.packageName;
+            if (pkg.equals(getPackageName()) || hidden.contains(pkg)) continue;
+            now.add(pkg + "/" + ri.activityInfo.name);
+        }
+        if (!now.equals(listed)) buildApps();
+    }
+
+    /** Queries the leanback launchers the grid shows — never this launcher, never hidden_apps —
+     *  into `all`, then refreshes the rows and starts the icon load. */
+    private void buildApps() {
+        PackageManager pm = getPackageManager();
+        // The same apps the grid shows: never the launcher itself, never hidden_apps.
+        Set<String> hidden = new HashSet<>(Config.load(this).hiddenApps);
+        Intent q = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+        listed.clear();
+        all.clear();
+        for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
+            ApplicationInfo ai = ri.activityInfo.applicationInfo;
+            String pkg = ai.packageName;
+            if (pkg.equals(getPackageName()) || hidden.contains(pkg)) continue;
+            listed.add(pkg + "/" + ri.activityInfo.name);
+            String label = String.valueOf(ri.loadLabel(pm));
+            Intent launch = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
+                    .setClassName(ri.activityInfo.packageName, ri.activityInfo.name)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            all.add(new AppEntry(label, pkg, launch, ri));
+        }
+        Collections.sort(all, (a, b) -> a.label.compareToIgnoreCase(b.label));
+        filter(query);
+        loadIcons(pm);
+    }
+
+    /** A row can outlive its app: it is disabled or uninstalled after the list was built. Android
+     *  throws in that case — say so instead of crashing, and drop the stale list. */
+    private void launch(AppEntry e) {
+        try {
+            startActivity(e.launch);
+        } catch (ActivityNotFoundException | SecurityException ex) {
+            Toast.makeText(this, R.string.not_available, Toast.LENGTH_SHORT).show();
+            buildApps();
+        }
     }
 
     /** Loads every icon off the main thread — loadIcon decodes bitmaps, and doing that for the whole
@@ -110,6 +153,7 @@ public class SearchActivity extends Activity {
     }
 
     private void filter(String q) {
+        query = q;
         executor.execute(() -> {
             List<AppEntry> result = new ArrayList<>();
             for (AppEntry e : all) {
@@ -145,12 +189,12 @@ public class SearchActivity extends Activity {
             final AppEntry e = shown.get(position);
             h.icon.setImageDrawable(e.icon != null ? e.icon : placeholder);
             h.label.setText(e.label);
-            h.itemView.setOnClickListener(v -> startActivity(e.launch));
+            h.itemView.setOnClickListener(v -> launch(e));
             h.itemView.setOnKeyListener((v, keyCode, event) -> {
                 if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
                 if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER
                         || keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
-                    startActivity(e.launch);
+                    launch(e);
                     return true;
                 }
                 return false;
