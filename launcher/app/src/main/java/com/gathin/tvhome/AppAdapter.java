@@ -186,7 +186,14 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
                 // Placeholder now; the real icon lands on the entry when the load finishes.
                 icon = ctx.getDrawable(R.drawable.ic_placeholder_banner);
                 bgExecutor.submit(() -> {
-                    Drawable realIcon = ri.loadIcon(pm);
+                    Drawable realIcon;
+                    try {
+                        realIcon = ri.loadIcon(pm);
+                    } catch (PackageManager.NameNotFoundException | Resources.NotFoundException ex) {
+                        // The package or its resources vanished between the query and this load;
+                        // the task just leaves the placeholder in place.
+                        return;
+                    }
                     if (realIcon != null) {
                         iconCache.put(iconKey, realIcon);
                         uiHandler.post(() -> applyLoadedArtwork(pkg, false, realIcon));
@@ -361,7 +368,13 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
                 // fall through
             }
         }
-        return scaledBanner(ri.activityInfo.loadBanner(pm));
+        // The last leg runs outside the try above: it re-asks the package for the banner, and the
+        // package can be gone by then. Null keeps the placeholder; the caller skips null loads.
+        try {
+            return scaledBanner(ri.activityInfo.loadBanner(pm));
+        } catch (PackageManager.NameNotFoundException | Resources.NotFoundException ignored) {
+            return null;
+        }
     }
 
     /**
