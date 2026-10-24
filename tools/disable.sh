@@ -17,8 +17,10 @@ export MSYS_NO_PATHCONV=1
 # Refuse the whole list unless every entry is a bare package name (#165).
 # Normalise first: Notepad on Windows saves a BOM and CRLF, and without this the first "# TV" line
 # arrives as a package name and every entry keeps a trailing \r (#208).
+# [[:space:]], not \s: BSD grep/sed on macOS do not honour \s in ERE, and a missed indented
+# comment would arrive here as a "package name" and refuse the whole list.
 PKGS=$(LC_ALL=C awk 'NR==1{sub(/^\357\273\277/,"")} {sub(/\r$/,""); print}' "$LIST" \
-  | grep -vE '^\s*(#|$)' | sed -E 's/\s+#.*$//' | awk '{print $1}')
+  | grep -vE '^[[:space:]]*(#|$)' | sed -E 's/[[:space:]]+#.*$//' | awk '{print $1}')
 BAD=$(printf '%s\n' "$PKGS" | grep -vE '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$' || true)
 if [ -n "$BAD" ]; then
   { echo "refusing $LIST: not a package name:"; printf '%s\n' "$BAD" | sed 's/^/  /'; } >&2

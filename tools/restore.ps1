@@ -12,6 +12,10 @@ $ErrorActionPreference = 'Stop'
 $OutputEncoding = New-Object System.Text.UTF8Encoding $false
 $repo = Split-Path -Parent $PSScriptRoot
 $List = (Resolve-Path $List).Path
+# $Stock is pasted into a shell command on the TV just like the list entries (#165): only a package name.
+if ($Stock -notmatch '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$') {
+    throw "refusing -Stock '$Stock': not a package name"
+}
 $py = Join-Path $repo 'tools\venv\Scripts\python.exe'
 if (-not $TvHost) { throw 'pass -TvHost <tv ip> or set $env:TV_HOST' }
 $env:TV_HOST = $TvHost

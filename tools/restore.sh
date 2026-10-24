@@ -10,13 +10,21 @@ LIST_DIR="$(cd "$(dirname "$LIST")" && pwd)"
 LIST="$LIST_DIR/$(basename "$LIST")"
 cd "$(dirname "$0")/.."
 STOCK="${2:-com.google.android.tvlauncher}"
+# STOCK is pasted into a shell command on the TV just like the list entries: accept only a
+# package name (no "none" here — pass the real stock launcher, this script re-enables it).
+if ! printf '%s' "$STOCK" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$'; then
+  echo "refusing STOCK='$STOCK': not a package name" >&2
+  exit 1
+fi
 PY=tools/venv/bin/python
 [ -x "$PY" ] || PY=tools/venv/Scripts/python.exe
 export MSYS_NO_PATHCONV=1
 # Same check as disable.sh: the list is contributor-supplied and each entry becomes a shell
 # command on the TV. A BOM and CRLF from a Windows editor are dropped first (#165, #208).
+# [[:space:]], not \s: BSD grep/sed on macOS do not honour \s in ERE, and a missed indented
+# comment would arrive here as a "package name" and refuse the whole list.
 PKGS=$(LC_ALL=C awk 'NR==1{sub(/^\357\273\277/,"")} {sub(/\r$/,""); print}' "$LIST" \
-  | grep -vE '^\s*(#|$)' | sed -E 's/\s+#.*$//' | awk '{print $1}')
+  | grep -vE '^[[:space:]]*(#|$)' | sed -E 's/[[:space:]]+#.*$//' | awk '{print $1}')
 BAD=$(printf '%s\n' "$PKGS" | grep -vE '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$' || true)
 if [ -n "$BAD" ]; then
   { echo "refusing $LIST: not a package name:"; printf '%s\n' "$BAD" | sed 's/^/  /'; } >&2
