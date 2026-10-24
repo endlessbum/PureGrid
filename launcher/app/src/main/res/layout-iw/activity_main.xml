@@ -148,34 +148,85 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:baselineAligned="true">
-                        <TextClock
-                            android:id="@+id/clock"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:format12Hour="h:mm"
-                            android:format24Hour="HH:mm"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="52sp"
-                            android:fontFamily="@font/outfit"
-                            android:fontVariationSettings="'wght' 300"
-                            android:letterSpacing="-0.04"
-                            android:includeFontPadding="false" />
 
-                        <TextClock
-                            android:id="@+id/ampm"
+                        <!-- The clock slot is a one-way carousel, as in layout/activity_main.xml:
+                             the clock face and the weather face take turns sliding through it,
+                             always travelling left to right. slideClockSlot() treats the slot's
+                             parent as this row, so the slot stays a direct child of it. -->
+                        <FrameLayout
+                            android:id="@+id/clockSlot"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:layout_gravity="bottom"
-                            android:layout_marginBottom="8dp"
-                            android:format12Hour="a"
-                            android:format24Hour=""
-                            android:textColor="#B3FFFFFF"
-                            android:textSize="15sp"
-                            android:fontFamily="@font/outfit"
-                            android:fontVariationSettings="'wght' 500"
-                            android:letterSpacing="0.08"
-                            android:textAllCaps="true" />
+                            android:layout_height="wrap_content">
+
+                            <LinearLayout
+                                android:id="@+id/clockFace"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextClock
+                                    android:id="@+id/clock"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:format12Hour="h:mm"
+                                    android:format24Hour="HH:mm"
+                                    android:textColor="#FFFFFFFF"
+                                    android:textSize="52sp"
+                                    android:fontFamily="@font/outfit"
+                                    android:fontVariationSettings="'wght' 300"
+                                    android:letterSpacing="-0.04"
+                                    android:includeFontPadding="false" />
+
+                                <TextClock
+                                    android:id="@+id/ampm"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:layout_gravity="bottom"
+                                    android:layout_marginBottom="8dp"
+                                    android:format12Hour="a"
+                                    android:format24Hour=""
+                                    android:textColor="#B3FFFFFF"
+                                    android:textSize="15sp"
+                                    android:fontFamily="@font/outfit"
+                                    android:fontVariationSettings="'wght' 500"
+                                    android:letterSpacing="0.08"
+                                    android:textAllCaps="true" />
+                            </LinearLayout>
+
+                            <!-- The weather slide, mirroring the base layout: the temperature in
+                                 the clock's own type and size, so the swap is like for like.
+                                 Without a connection the crossed cloud takes the temp's place. -->
+                            <FrameLayout
+                                android:id="@+id/weatherFace"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="start|center_vertical"
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:id="@+id/weatherTemp"
+                                    android:gravity="left"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:singleLine="true"
+                                    android:textColor="#FFFFFFFF"
+                                    android:textSize="52sp"
+                                    android:fontFamily="@font/outfit"
+                                    android:fontVariationSettings="'wght' 300"
+                                    android:letterSpacing="-0.04"
+                                    android:includeFontPadding="false" />
+
+                                <ImageView
+                                    android:id="@+id/weatherIcon"
+                                    android:layout_width="46dp"
+                                    android:layout_height="46dp"
+                                    android:layout_gravity="start|center_vertical"
+                                    android:src="@drawable/ic_weather_off"
+                                    android:contentDescription="@string/weather_offline"
+                                    android:visibility="gone" />
+                            </FrameLayout>
+                        </FrameLayout>
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
