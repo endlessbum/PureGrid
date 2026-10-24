@@ -1907,6 +1907,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
         if (am == null) return;
+        // From Android 14 the platform turns killBackgroundProcesses into a silent no-op for any
+        // package but our own (behavior change for all apps): no SecurityException, so the loop
+        // below would still end in "Cleaning done" with nothing cleaned. Say so instead.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            Toast.makeText(this, R.string.cleaning_unavailable, Toast.LENGTH_LONG).show();
+            return;
+        }
         btnClear.setEnabled(false);
         btnClear.animate().scaleX(0.9f).scaleY(0.9f).setDuration(120).withEndAction(() ->
                 btnClear.animate().scaleX(1f).scaleY(1f).setDuration(120).start()).start();

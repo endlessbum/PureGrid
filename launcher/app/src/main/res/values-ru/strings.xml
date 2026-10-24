@@ -10,6 +10,7 @@
     <string name="search">Поиск</string>
     <string name="cleared_apps">Закрыто %1$d приложений</string>
     <string name="cleaning_started">Очистка запущена</string>
+    <string name="cleaning_unavailable">На Android 14 и новее система не позволяет сторонним приложениям завершать фоновые процессы других приложений</string>
     <string name="cleaned">Очистка выполнена</string>
     <string name="cleared_mb">Освобождено %1$d МБ</string>
     <string name="choose_input">Источники</string>

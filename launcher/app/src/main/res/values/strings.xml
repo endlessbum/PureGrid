@@ -29,6 +29,7 @@
     <string name="cleared_mb">Freed %1$d MB</string>
     <string name="cleaned">Cleaning done</string>
     <string name="cleaning_started">Cleaning started</string>
+    <string name="cleaning_unavailable">On Android 14 and newer the system does not let a launcher end background processes of other apps</string>
     <string name="cleared_apps">Closed %1$d apps</string>
     <string name="not_available">Not available on this TV</string>
     <string name="cant_open">Can\'t open %1$s</string>
