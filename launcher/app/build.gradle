@@ -36,8 +36,6 @@ android {
 dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
-    // WorkManager for background refreshes
-    implementation 'androidx.work:work-runtime:2.9.0'
     // Test only (never in the APK): plain JVM tests for the module card validators, src/test.
     // On a machine whose project path contains non-ASCII characters, `gradlew test` cannot load
     // the test classes (a Gradle worker arg-file encoding issue on Windows): every test fails

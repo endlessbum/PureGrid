@@ -305,9 +305,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             handler.post(MainActivity.this::updateWifiLabel);
             if (Intent.ACTION_PACKAGE_ADDED.equals(action) || Intent.ACTION_PACKAGE_REMOVED.equals(action) || Intent.ACTION_PACKAGE_CHANGED.equals(action)) {
                 reloadApps(false);
-            } else if ("com.gathin.tvhome.ACTION_REFRESH_APPS".equals(action)) {
-                // Refresh request from WorkManager.
-                reloadApps(false);
             }
         }
     };
@@ -332,18 +329,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Energy Saver TV Settings.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
-        // Schedule periodic app list refresh (every 6 hours) via WorkManager.
-        androidx.work.PeriodicWorkRequest refreshRequest = new androidx.work.PeriodicWorkRequest.Builder(
-                RefreshAppsWorker.class, java.util.concurrent.TimeUnit.HOURS.toMillis(6), java.util.concurrent.TimeUnit.MILLISECONDS)
-                .addTag("refresh-apps")
-                .build();
-        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                "refresh-apps", androidx.work.ExistingPeriodicWorkPolicy.KEEP, refreshRequest);
         density = getResources().getDisplayMetrics().density;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
         Config cfg = Config.load(this);
-        // Provide the dock order to DockOrder for proper reordering.
-        DockOrder.setDockApps(cfg.dockApps);
         COLUMNS = cfg.columns;
         animations = cfg.animations;
         advancedEffects = cfg.animations && cfg.advancedEffects;
