@@ -26,10 +26,14 @@ import java.util.Locale;
  */
 public class AccountAvatarView extends View {
     private TextPaint letterPaint;
+    private final Paint scalePaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
     private ColorStateList tint;
     /** The avatar exactly as delivered; the circle-cut copy is (re)built on every size change. */
     private Bitmap avatar;
     private Bitmap cutout;
+    /** Which photo and box size `cutout` was built from: an unchanged pair skips the rebuild. */
+    private Bitmap cutoutSource;
+    private int cutoutBox;
     private String letter = "G";
 
     public AccountAvatarView(Context context, AttributeSet attrs) {
@@ -60,18 +64,28 @@ public class AccountAvatarView extends View {
         buildCutout();
     }
 
-    /** Centre-crops the photo to a square the size of the button's inner box; onDraw clips that round. */
+    /** Centre-crops the photo to a square the size of the button's inner box; onDraw clips that round.
+     *  Drawn straight into the final bitmap: a createBitmap crop followed by createScaledBitmap
+     *  first allocates a full square copy of the photo, and this runs again on every return to
+     *  the launcher. No recycle() on the replaced cutout: it may still be referenced by a pending
+     *  hardware draw, and the GC reclaims it. */
     private void buildCutout() {
         if (avatar == null) {
             cutout = null;
+            cutoutSource = null;
             return;
         }
         int box = Math.max(1, Math.min(getWidth() - getPaddingLeft() - getPaddingRight(),
                 getHeight() - getPaddingTop() - getPaddingBottom()));
+        if (cutout != null && cutoutSource == avatar && cutoutBox == box) return;
+        cutoutSource = avatar;
+        cutoutBox = box;
         int side = Math.max(1, Math.min(avatar.getWidth(), avatar.getHeight()));
-        Bitmap square = Bitmap.createBitmap(avatar, (avatar.getWidth() - side) / 2,
-                (avatar.getHeight() - side) / 2, side, side);
-        cutout = Bitmap.createScaledBitmap(square, box, box, true);
+        int left = (avatar.getWidth() - side) / 2, top = (avatar.getHeight() - side) / 2;
+        Bitmap out = Bitmap.createBitmap(box, box, Bitmap.Config.ARGB_8888);
+        new Canvas(out).drawBitmap(avatar, new Rect(left, top, left + side, top + side),
+                new Rect(0, 0, box, box), scalePaint);
+        cutout = out;
     }
 
     @Override
