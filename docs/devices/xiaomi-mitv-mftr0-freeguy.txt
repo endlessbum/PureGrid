@@ -1,0 +1,123 @@
+# Xiaomi TV S Pro Mini LED 75, China (MiTV-MFTR0, кодовое имя freeguy, MediaTek MT9653/mt5879).
+# Android 14 (SDK 34), прошивка OS3.0.101.0.UFTMATV.
+# Проверено на реальном телевизоре 2026-10-19, в одной сессии работы.
+# Код эталонного лаунчера просмотрен на upstream-коммите 8a8249f (версия 2.2).
+# Только заметки о совместимости: в этом файле намеренно НЕТ записей на отключение пакетов.
+# Debloat-список на этой прошивке несколько дней не применялся.
+# Пакет стокового лаунчера, для опознания: com.mitv.tvhome.
+#
+# ---- Физические HDMI-порты и framework-идентификаторы входов ----
+# У этой модели ТРИ физических HDMI-входа. TvInputManager дополнительно регистрирует четвёртый
+# вход; HW8 не является признаком четвёртого физического разъёма.
+#
+# Порт   TvInputInfo ID                                              INTEGER extra Xiaomi
+# HDMI1  com.mediatek.tvinput/.hdmi.HDMIInputService/HW5               input=23
+# HDMI2  com.mediatek.tvinput/.hdmi.HDMIInputService/HW6               input=24
+# HDMI3  com.mediatek.tvinput/.hdmi.HDMIInputService/HW7               input=25
+# Extra  com.mediatek.tvinput/.hdmi.HDMIInputService/HW8               физического разъёма нет
+#
+# HDMI2 — порт eARC. С подключённой саундбарой framework сообщал CONNECTED, и лаунчер показывал
+# «Подключено» с зелёной точкой. Для чисто аудиоустройства eARC это уместно.
+# Внешний видеоплеер/ПК во время этих проверок не подключался; видеовоспроизведение не проверялось.
+#
+# ---- TV/ATV, AV и DTMB: не пропускайте входы без HDMI ----
+# Метка       TvInputInfo ID                                                source ID Xiaomi
+# TV / ATV    com.mediatek.tvinput/.tuner.TunerInputService/HW1                1 (аналоговое ТВ)
+# DTMB        com.mediatek.tvinput/.tuner.TunerInputService/HW0                28 (цифровое ТВ)
+# AV          com.mediatek.tvinput/.composite.CompositeInputService/HW2        2 (композитное видео)
+#
+# Пункт меню «Composite» — это AV-вход, а не имя приложения/пакета. Показывайте его как AV.
+# Обоим тюнерным входам нужны собственные маршруты (или пункт ТВ с выбором аналог/цифра); это
+# входы TYPE_TUNER, поэтому цикл passthrough-input нетронутого эталонного лаунчера не перечисляет
+# их отдельно. Локальная тестовая сборка проверила клики меню AV, TV/ATV и DTMB и их сессии
+# HW2/HW1/HW0. Стандартный live_tv_package, com.mediatek.wwtv.tvcenter, на этой прошивке не тот
+# вход, который используется.
+#
+# TV / ATV:
+#   action:    com.xiaomi.mitv.tvplayer.ATV_PLAY
+#   component: com.xiaomi.mitv.tvplayer/.AtvActivity
+#   am start -a com.xiaomi.mitv.tvplayer.ATV_PLAY -n com.xiaomi.mitv.tvplayer/.AtvActivity
+# DTMB:
+#   action:    com.xiaomi.mitv.tvplayer.DTMB_PLAY
+#   component: com.xiaomi.mitv.tvplayer/.dtmb.DTMBActivity
+#   am start -a com.xiaomi.mitv.tvplayer.DTMB_PLAY -n com.xiaomi.mitv.tvplayer/.dtmb.DTMBActivity
+# AV:
+#   action:    com.xiaomi.mitv.tvplayer.EXTSRC_PLAY
+#   component: com.xiaomi.mitv.tvplayer/.ExternalSourceActivity
+#   параметр:  INTEGER extra input=2
+#   am start -a com.xiaomi.mitv.tvplayer.EXTSRC_PLAY -n com.xiaomi.mitv.tvplayer/.ExternalSourceActivity --ei input 2
+# Все три activity открылись и создали сессии на HW1/HW0/HW2 соответственно. ATV- и DTMB-activity
+# выбирают источник внутри себя; их source ID выше — не обязательные extras для запуска.
+# Сканирование каналов, приём RF и видеовоспроизведение по AV не тестировались.
+#
+# ---- Точка входа источников сигнала Xiaomi ----
+# Package/activity: com.xiaomi.mitv.tvplayer/.ExternalSourceActivity
+# Action: com.xiaomi.mitv.tvplayer.EXTSRC_PLAY
+# Обязательный параметр: INTEGER extra «input» со значениями выше.
+#
+# Примеры обычных запусков activity из ADB-шелла телевизора:
+#   am start -a com.xiaomi.mitv.tvplayer.EXTSRC_PLAY -n com.xiaomi.mitv.tvplayer/.ExternalSourceActivity --ei input 23
+#   am start -a com.xiaomi.mitv.tvplayer.EXTSRC_PLAY -n com.xiaomi.mitv.tvplayer/.ExternalSourceActivity --ei input 24
+#   am start -a com.xiaomi.mitv.tvplayer.EXTSRC_PLAY -n com.xiaomi.mitv.tvplayer/.ExternalSourceActivity --ei input 25
+# Реальные сессии входов ТВ проверены и соответствуют HW5/HW6/HW7 соответственно.
+#
+# Нетронутый эталонный лаунчер шлёт ACTION_VIEW с passthrough-URI канала и MIME
+# vnd.android.cursor.item/channel. На этой прошивке ни одна activity этот intent не обработала;
+# тост лаунчера «Недоступно на этом телевизоре» не означает, что железо не умеет переключать
+# HDMI-входы. Одна лишь настройка input_action всё равно шлёт URI канала: она не добавляет
+# целочисленный extra Xiaomi. Данные входов здесь — материал для адаптации, а не утверждение,
+# что текущий upstream-код их использует.
+#
+# ---- Метки состояния входов ----
+# TvInputManager сообщает CONNECTED=0, CONNECTED_STANDBY=1, DISCONNECTED=2.
+# В снятой сессии HDMI1/HW5 и HDMI3/HW7 сообщали 1, HDMI2/HW6 — 0, а AV/HW2 — 2. Эталонное меню
+# показывает зелёную точку и «Подключено» для 0, «Нет устройства» для 2 и никакого текста
+# состояния для 1. Оно также прячет состояние HDMI, когда все перечисленные HDMI-порты сообщают 0.
+# Это объясняет, почему AV может показывать «Нет устройства», а неиспользуемые строки HDMI —
+# не иметь текста состояния. Состояние 1 — это standby-состояние framework'а, отдельное от
+# DISCONNECTED. Тюнерные входы сообщали 0. Локальная тестовая сборка прячет текст состояния
+# тюнеров; приём RF остался за рамками этих проверок.
+#
+# ---- Пункты настроек Xiaomi ----
+# Универсальный android.settings.SETTINGS резолвится в com.android.tv.settings/.MainSettings
+# (AOSP), а не в интерфейс настроек картинки/звука/общих настроек Xiaomi.
+#
+# Настройки Xiaomi:
+#   action:    com.xiaomi.mitv.settings.SETTINGS
+#   component: com.xiaomi.mitv.settings/.entry.MainActivity
+#   am start -a com.xiaomi.mitv.settings.SETTINGS -n com.xiaomi.mitv.settings/.entry.MainActivity
+# Настройки Wi-Fi Xiaomi:
+#   action:    com.xiaomi.mitv.settings.WIFI_SETTINGS
+#   component: com.xiaomi.mitv.settings/.wifi.MitvWifiActivity
+#   am start -a com.xiaomi.mitv.settings.WIFI_SETTINGS -n com.xiaomi.mitv.settings/.wifi.MitvWifiActivity
+# Оба входа резолвятся и открываются на телевизоре. Локальная тестовая сборка проверила открытие
+# настроек Xiaomi и кнопкой «Настройки» в шапке, и плиткой «Настройки» в сетке приложений, а
+# кнопкой Wi-Fi — открытие настроек Wi-Fi Xiaomi. Переопределение одной лишь верхней кнопки не
+# перенаправляет плитку AOSP.
+#
+# ---- Перечисление приложений на этой прошивке для китайского рынка ----
+# Эталонный AppAdapter запрашивает только MAIN + CATEGORY_LEANBACK_LAUNCHER. Несколько приложений
+# Xiaomi, включая com.xiaomi.mitv.settings, вместо этого отдают MAIN + CATEGORY_LAUNCHER и
+# выпадают. Если лаунчер показывает такие приложения, в <queries> манифеста нужен и обычный
+# intent LAUNCHER. Совмещая обе категории, предпочитайте ТВ-вход для каждого пакета и избегайте
+# дублирующихся плиток. Если настройки Xiaomi перечислены напрямую, подавляйте дублирующую плитку
+# AOSP-настроек, когда она ведёт в те же настройки Xiaomi. Каждый выбранный вход запускайте с его
+# категорией. Стандартный список hidden_apps отдельно исключает com.mitv.gallery (приложение
+# фото/галереи). Локальная тестовая сборка совместила категории и очистила hidden_apps этого
+# профиля устройства: появились плитка настроек Xiaomi, галерея, голосовые настройки и прочие
+# приложения обычного лаунчера. Плитка настроек Xiaomi была нажата, и её назначение проверено.
+# Само по себе перечисление приложения не означает, что все его функции работают на этой
+# прошивке; отключённые пакеты остаются исключёнными из обычных запросов лаунчера, и автоматически
+# включать их обратно не следует.
+#
+# ---- Объём проверки ----
+# Локальная тестовая сборка показала ровно HDMI1/2/3 плюс AV, TV/ATV и DTMB. Все шесть маршрутов
+# источников проверены обычными запусками activity и совпадающими сессиями входов ТВ. Также
+# проверены клики меню AV/TV/DTMB и клики «Настройки»/«Wi-Fi» выше. Экспериментальный код
+# лаунчера, профиль устройства и сборочный процесс — вне этого документационного вклада.
+#
+# Это заметка о маршрутизации/перечислении входов, а не список на отключение системных сервисов.
+# Сохраните приложение источников сигнала, настройки Xiaomi и TV input сервисы MTK. Запись
+# стокового HOME оставлена. Для этого вклада не проводились: сканирование каналов, приём RF,
+# внешняя картинка по HDMI, воспроизведение видео по AV, холодная загрузка, режим ожидания и
+# долгосрочное регрессионное тестирование. Эти выводы нельзя обобщать на другие сборки прошивки.

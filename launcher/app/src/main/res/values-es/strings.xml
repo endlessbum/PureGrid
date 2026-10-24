@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Inicio</string>
+    <string name="inputs">Entradas</string>
+    <string name="input">Entrada</string>
+    <string name="wifi">Wi-Fi</string>
+    <string name="settings">Ajustes</string>
+    <string name="clear">Clear</string>
+    <string name="search">Search</string>
+    <string name="cleared_mb">Freed %1$d MB</string>
+    <string name="choose_input">Entradas</string>
+    <string name="connected">Conectado</string>
+    <string name="standby">En espera</string>
+    <string name="not_connected">Sin dispositivo</string>
+    <string name="live_tv">TV en vivo</string>
+    <string name="no_inputs">No se encontraron entradas</string>
+    <string name="good_morning">Buenos días</string>
+    <string name="good_afternoon">Buenas tardes</string>
+    <string name="good_evening">Buenas noches</string>
+    <string name="good_night">Buenas noches</string>
+    <string name="ethernet">Ethernet</string>
+    <string name="offline">Sin conexión</string>
+    <string name="not_available">No disponible en este TV</string>
+    <string name="cant_open">No se puede abrir %1$s</string>
+    <string name="date_format">d \'de\' MMMM</string>
+    <string name="dream_name">Reloj</string>
+    <string name="launcher_settings">Ajustes del lanzador</string>
+    <string name="columns_label">Aplicaciones por fila</string>
+    <string name="animations_state">Animación: %1$s</string>
+    <string name="follow_theme">Seguir el tema (restablecer ajustes)</string>
+    <string name="follow_theme_hint">Usa el diseño y los efectos del tema actual o los valores integrados. Aplicar o restablecer un tema también borra estos ajustes.</string>
+    <string name="tv_settings">Ajustes del televisor</string>
+    <string name="on">Sí</string>
+    <string name="off">No</string>
+</resources>

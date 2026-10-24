@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A focused glass row turns white, like the top-bar pills: the label flips to ink. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:color="#FF101419" />
+    <item android:color="#FFFFFFFF" />
+</selector>
