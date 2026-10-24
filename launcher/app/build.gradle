@@ -12,6 +12,8 @@ android {
         targetSdk 34
         versionCode 4
         versionName '2.3'
+        // Runs the src/androidTest suite on a device (connectedDebugAndroidTest).
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
     buildTypes {
@@ -42,4 +44,10 @@ dependencies {
     // with ClassNotFoundException while the classes themselves are fine. Run the suite from an
     // ASCII-only path, or from an IDE.
     testImplementation 'junit:junit:4.13.2'
+    // Instrumentation tests (src/androidTest): run on the TV itself via connectedDebugAndroidTest.
+    // Test only (never in the APK).
+    androidTestImplementation 'androidx.test:core:1.6.1'
+    androidTestImplementation 'androidx.test:runner:1.6.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
 }
