@@ -27,7 +27,10 @@
 
     <!-- Some TVs give their Live TV app no leanback entry point at all, so `live_tv_package` above
          resolves to nothing (TCL Android TV 9 on China-market sets is one). This action is then sent
-         to that package instead, and the app starts normally. Leave empty to omit. -->
+         to that package instead, and the app starts normally. Leave empty to omit.
+         Android 11+ note: the manifest <queries> only declares leanback launchers, so the action
+         fallback resolves on those versions only while the package exposes some entry the queries
+         cover. If a firmware's Live TV app has neither, add its package to the manifest <queries>. -->
     <string name="live_tv_action" translatable="false"></string>
 
     <!-- TVs with no TvInputManager have no HDMI list to read, but their own source-selection panel
@@ -46,12 +49,31 @@
          projector remote's gear button is scancode 384 (KEY_TAPE). Find yours with
          `tools/tv.py 'getevent -lt'` while pressing the button. Leave empty to omit. -->
     <integer-array name="settings_key_scancodes">
+        <!-- This TV's BLE remote FAV button: getevent shows EV_KEY 01a0 = 416 (KEY_VIDEOPHONE);
+             Android maps it to nothing, so the FAV press would otherwise be dropped. -->
+        <item>416</item>
+        <!-- This TV's <new> button: getevent shows EV_KEY 00f0 = 240 (KEY_UNKNOWN). -->
+        <item>240</item>
     </integer-array>
-    <!-- The same by Android keycode, for buttons whose scancode is shared. TCL Google TV remotes send their
-         Settings button as keycode 83 (KEYCODE_NOTIFICATION, which the stock Google TV home turned into its quick
-         settings panel) on scancode 240 (KEY_UNKNOWN), the scancode several TCL buttons share. Find the keycode
-         with `tools/tv.py 'logcat -v time -s InputReader:D'` while pressing the button. Leave empty to omit. -->
     <integer-array name="settings_key_keycodes">
+    </integer-array>
+
+    <!-- Remote buttons that toggle the VPN (same as the network pill). -->
+    <integer-array name="vpn_key_scancodes">
+        <!-- This TV's "Network" button: getevent shows EV_KEY 01b7 = 439. -->
+        <item>439</item>
+    </integer-array>
+    <integer-array name="vpn_key_keycodes">
+    </integer-array>
+
+    <!-- Remote buttons that open the Inputs (Вход) dropdown under the top-right pill. Same scancode rule
+         as above; empty leaves the behaviour untouched. -->
+    <integer-array name="inputs_key_scancodes">
+        <!-- This TV's BLE remote CD/Media button: getevent shows EV_KEY 017f = 383 (KEY_CD);
+             Android maps it to nothing, so the press would otherwise be dropped. -->
+        <item>383</item>
+    </integer-array>
+    <integer-array name="inputs_key_keycodes">
     </integer-array>
 
     <!-- Show the Solar Hijri (Shamsi) date used in Iran and Afghanistan, e.g. "27 Mehr 1405", above the
@@ -99,4 +121,11 @@
          sets its opacity. Around 60 reads clearly without hiding a wallpaper. Can also be set with
          "sky_intensity": 60 in a theme's config.json. -->
     <integer name="sky_intensity">0</integer>
+
+    <!-- Content search (the poster strips under the app search): how many suggestion rows each
+         installed search-provider app (YouTube, Kinopoisk, …) is asked for per query, and how long
+         one app may take to answer before its strip is skipped for that query. Slow TVs can raise
+         both in a theme's config.json: "search_provider_limit": 12, "search_provider_timeout_ms": 4000. -->
+    <integer name="search_provider_limit">8</integer>
+    <integer name="search_provider_timeout_ms">2500</integer>
 </resources>

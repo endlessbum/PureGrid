@@ -17,7 +17,15 @@ if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Sc
 if (-not $TvHost) { throw 'pass -TvHost <tv ip> or set $env:TV_HOST' }
 $env:TV_HOST = $TvHost
 
-$pkgs = Get-Content $List | ForEach-Object { ($_ -replace '#.*$', '').Trim() } | Where-Object { $_ } | ForEach-Object { ($_ -split '\s+')[0] }
+# -Encoding UTF8: PowerShell 5.1 otherwise reads a UTF-8 list as ANSI and Cyrillic comments turn
+# to mojibake (package names are ASCII and would survive, but the log would not).
+# Comment parsing mirrors disable.sh: only a comment preceded by whitespace is stripped, and a
+# whole-line comment is dropped — "pkg#note" stays whole and is refused by the name check, the
+# same list must parse the same way on Windows and in bash.
+$pkgs = Get-Content $List -Encoding UTF8 |
+    ForEach-Object { ($_ -replace '\s+#.*$', '').Trim() } |
+    Where-Object { $_ -and -not $_.StartsWith('#') } |
+    ForEach-Object { ($_ -split '\s+')[0] }
 # Lists come from contributors and each name is pasted into a shell command on the TV (#165).
 $bad = @($pkgs | Where-Object { $_ -notmatch '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$' })
 if ($bad.Count -gt 0) {
@@ -31,6 +39,9 @@ if ($pkgs -contains $setup -and -not $env:FORCE_SETUPWRAITH) {
     if ($wifi -match 'cname=[^ ]*setupwraith') {
         Write-Warning "Skipping ${setup}: the saved Wi-Fi network belongs to it, and disabling it would delete that network and take the TV off Wi-Fi. Forget the network and join it again in Settings > Network & Internet, then run this again (or set `$env:FORCE_SETUPWRAITH=1 on Ethernet)."
         $pkgs = @($pkgs | Where-Object { $_ -ne $setup })
+    } elseif (-not $wifi) {
+        # Fail closed, like disable.sh: an unreadable probe must not wave setupwraith through.
+        throw "could not read the Wi-Fi state (empty dumpsys), so the setupwraith guard could not check who owns the saved network. Restore the connection and re-run, or set `$env:FORCE_SETUPWRAITH=1."
     }
 }
 $cmds = @($pkgs | ForEach-Object { "pm disable-user --user 0 $_" })
@@ -41,3 +52,10 @@ $cmds = @($pkgs | ForEach-Object { "pm disable-user --user 0 $_" })
 $cmds += @($pkgs | ForEach-Object { "am force-stop $_" })
 $cmds += 'pm list packages -d'
 $cmds | & $py -I (Join-Path $repo 'tools\tv.py') --batch
+# tv.py exits 1 when a command answered Error/Failure (the batch summary above lists which).
+# $ErrorActionPreference does not see native exit codes, so without this check a half-applied
+# list would look like a success — parity with the WARNING in disable.sh.
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning 'Some commands answered Error/Failure (see the batch summary above); the list may be half-applied. The script is idempotent - re-run it to retry the failed entries.'
+    exit $LASTEXITCODE
+}

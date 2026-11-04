@@ -36,7 +36,11 @@ class DebloatPathsTest(unittest.TestCase):
             shutil.copy2(ROOT / "tools" / "disable.sh", tools / "disable.sh")
             client = tools / "venv" / "bin" / "python"
             client.parent.mkdir(parents=True)
-            client.write_text('#!/bin/sh\ncat > "$CAPTURE"\n')
+            # The scripts invoke the fake as "<client> -I tools/tv.py --batch", so --batch is the
+            # last argument, never $1. Only a --batch call reads the piped list; any other call
+            # (restore.sh's post-batch Home probe passes its command as an argument) answers
+            # nothing and must not clobber the capture with an empty file.
+            client.write_bytes(b'#!/bin/sh\ncase " $* " in *" --batch "*) cat > "$CAPTURE";; esac\n')
             client.chmod(0o755)
 
             package_list = base / "debloat.txt"
@@ -73,7 +77,11 @@ class DebloatPathsTest(unittest.TestCase):
             shutil.copy2(ROOT / "tools" / script, tools / script)
             client = tools / "venv" / "bin" / "python"
             client.parent.mkdir(parents=True)
-            client.write_text('#!/bin/sh\ncat > "$CAPTURE"\n')
+            # The scripts invoke the fake as "<client> -I tools/tv.py --batch", so --batch is the
+            # last argument, never $1. Only a --batch call reads the piped list; any other call
+            # (restore.sh's post-batch Home probe passes its command as an argument) answers
+            # nothing and must not clobber the capture with an empty file.
+            client.write_bytes(b'#!/bin/sh\ncase " $* " in *" --batch "*) cat > "$CAPTURE";; esac\n')
             client.chmod(0o755)
 
             package_list = base / "debloat.txt"
@@ -106,7 +114,11 @@ class DebloatPathsTest(unittest.TestCase):
             shutil.copy2(ROOT / "tools" / script, tools / script)
             client = tools / "venv" / "bin" / "python"
             client.parent.mkdir(parents=True)
-            client.write_text('#!/bin/sh\ncat > "$CAPTURE"\n')
+            # The scripts invoke the fake as "<client> -I tools/tv.py --batch", so --batch is the
+            # last argument, never $1. Only a --batch call reads the piped list; any other call
+            # (restore.sh's post-batch Home probe passes its command as an argument) answers
+            # nothing and must not clobber the capture with an empty file.
+            client.write_bytes(b'#!/bin/sh\ncase " $* " in *" --batch "*) cat > "$CAPTURE";; esac\n')
             client.chmod(0o755)
 
             package_list = base / "debloat.txt"
@@ -134,7 +146,11 @@ class DebloatPathsTest(unittest.TestCase):
             shutil.copy2(ROOT / "tools" / script, tools / script)
             client = tools / "venv" / "bin" / "python"
             client.parent.mkdir(parents=True)
-            client.write_text('#!/bin/sh\ncat > "$CAPTURE"\n')
+            # The scripts invoke the fake as "<client> -I tools/tv.py --batch", so --batch is the
+            # last argument, never $1. Only a --batch call reads the piped list; any other call
+            # (restore.sh's post-batch Home probe passes its command as an argument) answers
+            # nothing and must not clobber the capture with an empty file.
+            client.write_bytes(b'#!/bin/sh\ncase " $* " in *" --batch "*) cat > "$CAPTURE";; esac\n')
             client.chmod(0o755)
 
             caller = base / "caller folder"

@@ -1,3 +1,6 @@
-adb-shell
-rsa
-cryptography
+# Pinned to the versions this repo is tested with: an unpinned adb-shell major could change the
+# device API under tv.py between two installs on different days. Bump deliberately, run the
+# tests/ suite after.
+adb-shell==0.4.*
+rsa==4.*
+cryptography>=42,<51

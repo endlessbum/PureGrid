@@ -137,11 +137,45 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
     /** Calmer motion for weak GPUs (config.xml, reduced_motion): no overshoot, shorter fades. */
     private final boolean reducedMotion;
     private final List<Entry> items = new ArrayList<>();
+    /** Monotonic name source for the editor's "+"-slot synthetic components: their stable ids must
+     *  never repeat, and a slot index would after a removal left lower slots behind (getItemId). */
+    private int addSlotSeq;
     // Background executor for heavy loading (icons, banners).
     private final java.util.concurrent.ExecutorService bgExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
-    // Simple LRU caches for loaded drawables.
-    private final android.util.LruCache<String, Drawable> bannerCache = new android.util.LruCache<>(50);
+    // Simple LRU caches for loaded drawables. The banner cache is sized by decoded bytes: an
+    // entry-count cap never saw that fifty 576-px ARGB banners are ~36 MB of heap.
+    private final android.util.LruCache<String, Drawable> bannerCache =
+            new android.util.LruCache<String, Drawable>(16 * 1024 * 1024) {
+                @Override
+                protected int sizeOf(String key, Drawable value) {
+                    if (value instanceof BitmapDrawable) {
+                        Bitmap b = ((BitmapDrawable) value).getBitmap();
+                        if (b != null) return Math.max(1, b.getAllocationByteCount());
+                    }
+                    return 8 * 1024;   // a drawn/unknown drawable: a rough average
+                }
+            };
     private final android.util.LruCache<String, Drawable> iconCache = new android.util.LruCache<>(100);
+    /** Tile labels keyed by "pkg/activity": loadLabel is a binder call per package, and the
+     *  resume-path reload paid it for every app on every return to Home. Labels can only change
+     *  when a package changes, so {@link #invalidateLabels()} clears this on package broadcasts
+     *  and the frequent resume-path rebuilds reuse the cached names. Concurrent: buildEntries
+     *  (bgExecutor) writes it while the UI thread may clear it in invalidateLabels(). */
+    private final java.util.Map<String, String> labelCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Drops the cached tile labels; call whenever a package may have changed its label. */
+    void invalidateLabels() {
+        labelCache.clear();
+    }
+
+    /** Retires the background thread (and the caches) with the activity that owns the adapter:
+     *  recreate() builds a fresh adapter, and a single-thread executor never retires its parked
+     *  thread on its own — without this, every recreate() parked one more until the process died. */
+    void shutdown() {
+        bgExecutor.shutdownNow();
+        iconCache.evictAll();
+        bannerCache.evictAll();
+    }
     // Handler to post UI updates from background threads.
     private final android.os.Handler uiHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
@@ -165,6 +199,38 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
      * so focus follows it); hidden_apps wins over a card, and a card's package in dock_apps takes that slot.
      */
     void reload(List<Cards.Card> cards) {
+        reloadAsync(cards, null);
+    }
+
+    /** The same rebuild with a continuation: {@code onReady} runs on the UI thread after the fresh
+     *  tiles are published, so callers that position focus or measure the dock keep their order. */
+    void reloadAsync(List<Cards.Card> cards, Runnable onReady) {
+        // Snapshot the inputs on the calling (UI) thread: the build below runs off-thread and must
+        // not race a UI-side change of favourites/editing. `items` itself is only touched on the
+        // UI thread, in the publish below.
+        final List<Cards.Card> cardsSnap = new ArrayList<>(cards);
+        final List<String> favsSnap = new ArrayList<>(favourites);
+        final boolean hideBelowSnap = hideBelow, editingSnap = editing;
+        try {
+            bgExecutor.execute(() -> {
+                List<Entry> fresh = buildEntries(cardsSnap, favsSnap, hideBelowSnap, editingSnap);
+                uiHandler.post(() -> {
+                    items.clear();
+                    items.addAll(fresh);
+                    notifyDataSetChanged();
+                    if (onReady != null) onReady.run();
+                });
+            });
+        } catch (java.util.concurrent.RejectedExecutionException dead) {
+            // The adapter was shut down with its activity; there is no grid left to publish to.
+        }
+    }
+
+    /** The heavy half of the reload — the PackageManager query, label and banner loading, sorting
+     *  and the editor slots — built off the UI thread; returns the entries to publish. Only the
+     *  single bgExecutor thread runs this, so addSlotSeq stays serialised. */
+    private List<Entry> buildEntries(List<Cards.Card> cards, List<String> favs,
+                                     boolean hideBelowNow, boolean editingNow) {
         PackageManager pm = ctx.getPackageManager();
         Intent probe = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
         List<ResolveInfo> found = pm.queryIntentActivities(probe, 0);
@@ -175,7 +241,7 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             if (ri.activityInfo == null) continue;
             String pkg = ri.activityInfo.packageName;
             if (pkg.equals(ctx.getPackageName()) || hidden.contains(pkg)) continue;
-            if (hideBelow && !favourites.contains(pkg)) continue;
+            if (hideBelowNow && !favs.contains(pkg)) continue;
             ComponentName component = new ComponentName(pkg, ri.activityInfo.name);
             Cards.Card card = cardByPkg.get(pkg);
             if (card != null && !card.component.equals(component)) continue;   // the card stands in for this tile
@@ -204,12 +270,19 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
                 fresh.add(new Entry(Entry.CARD, card.label, component, banner, icon, card.caption, card.accent));
             } else {
                 // Same cleaner as the card prompt: an app label with a bidi override or line separator must not
-                // redraw the tile name as something else (#117).
-                fresh.add(new Entry(Cards.cleanLabel(String.valueOf(ri.loadLabel(pm)), pkg), component, banner, icon));
+                // redraw the tile name as something else (#117). Labels are cached per component: a
+                // label changes only when its package changes, and invalidateLabels() runs then.
+                String labelKey = component.flattenToShortString();
+                String label = labelCache.get(labelKey);
+                if (label == null) {
+                    label = Cards.cleanLabel(String.valueOf(ri.loadLabel(pm)), pkg);
+                    labelCache.put(labelKey, label);
+                }
+                fresh.add(new Entry(label, component, banner, icon));
             }
         }
         Collections.sort(fresh, (a, b) -> {
-            int fa = favourites.indexOf(a.pkg), fb = favourites.indexOf(b.pkg);
+            int fa = favs.indexOf(a.pkg), fb = favs.indexOf(b.pkg);
             if (fa >= 0 || fb >= 0) {
                 if (fa < 0) return 1;
                 if (fb < 0) return -1;
@@ -221,14 +294,16 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             return a.label.compareToIgnoreCase(b.label);
         });
         // In the dock editor, pad a short dock with "add" slots so the owner can fill it.
-        if (editing && favourites.size() < dockSize) {
+        if (editingNow && favs.size() < dockSize) {
             Drawable plus = ctx.getDrawable(R.drawable.ic_plus);
             // Never beyond the list end: a dock package can be missing from the resolved apps.
-            int at = Math.min(favourites.size(), fresh.size());
-            for (int i = favourites.size(); i < dockSize; i++) {
-                // A synthetic component keeps RecyclerView's stable ids happy (getItemId needs one).
+            int at = Math.min(favs.size(), fresh.size());
+            for (int i = favs.size(); i < dockSize; i++) {
+                // A synthetic component keeps RecyclerView's stable ids happy (getItemId needs one);
+                // the name must be unique for the adapter's lifetime, so a monotonic counter, not a
+                // slot index: two "slot2" entries crash RecyclerView's stable-id pass.
                 fresh.add(at++, new Entry(Entry.ADD, "+",
-                        new ComponentName(ADD_PKG, "slot" + i), null, plus, null, 0));
+                        new ComponentName(ADD_PKG, "slot" + addSlotSeq++), null, plus, null, 0));
             }
         }
         // Retain the optional Default-home tile until dependent tile-ordering work is merged.
@@ -238,9 +313,7 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
                     new ComponentName(ctx, HomeSettingsActivity.class), null,
                     ctx.getDrawable(R.drawable.ic_home_settings), null, 0));
         }
-        items.clear();
-        items.addAll(fresh);
-        notifyDataSetChanged();
+        return fresh;
     }
 
     /** Replaces the dock order (used by the on-TV dock editor) and rebuilds the tiles. */
@@ -250,6 +323,16 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
     }
 
     public List<String> getFavourites() { return new ArrayList<>(favourites); }
+
+    /** How many dock favourites actually rendered a tile: a configured package that is not
+     *  installed (or is hidden) has none, and centring must count the real row, not the config. */
+    int dockTileCount() {
+        int n = 0;
+        for (Entry e : items) {
+            if ((e.kind == Entry.APP || e.kind == Entry.CARD) && favourites.contains(e.pkg)) n++;
+        }
+        return n;
+    }
 
     /**
      * Editor-only: move the dock app at {@code from} to {@code to} (a neighbour swap), touching
@@ -302,8 +385,10 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             Drawable plus = ctx.getDrawable(R.drawable.ic_plus);
             int at = Math.min(favourites.size(), items.size());
             for (int k = adds; k < want; k++) {
+                // Monotonic name: a positional one would collide with a surviving "+" slot of the
+                // same index, and duplicated stable ids crash RecyclerView (see reload()).
                 items.add(at, new Entry(Entry.ADD, "+",
-                        new ComponentName(ADD_PKG, "slot" + k), null, plus, null, 0));
+                        new ComponentName(ADD_PKG, "slot" + addSlotSeq++), null, plus, null, 0));
                 notifyItemInserted(at);
                 at++;
             }
@@ -397,9 +482,13 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             return null;      // not a file-backed bitmap: the plain drawable is the way
         }
         if (bounds.outWidth <= 0) return null;
-        if (bounds.outWidth <= max) return null;            // already small enough
+        if (bounds.outWidth <= max && bounds.outHeight <= max) return null;   // already small enough
+        // Sample by the larger dimension, not the width alone: a degenerate banner (576 wide,
+        // 100 000 tall) decoded width-only would allocate ~230 MB and take the launcher down.
         int sample = 1;
-        while (bounds.outWidth / (sample * 2) >= max) sample *= 2;
+        while (bounds.outWidth / (sample * 2) >= max || bounds.outHeight / (sample * 2) >= max) {
+            sample *= 2;
+        }
         BitmapFactory.Options opts = new BitmapFactory.Options();
         opts.inSampleSize = sample;
         Bitmap bitmap;
@@ -409,10 +498,11 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             return null;
         }
         if (bitmap == null) return null;
-        // inSampleSize only halves, so the result can still be wider than the card needs.
-        if (bitmap.getWidth() > max) {
-            float scale = max / (float) bitmap.getWidth();
-            Bitmap smaller = Bitmap.createScaledBitmap(bitmap, max,
+        // inSampleSize only halves, so the result can still be wider (or taller) than needed.
+        if (bitmap.getWidth() > max || bitmap.getHeight() > max) {
+            float scale = max / (float) Math.max(bitmap.getWidth(), bitmap.getHeight());
+            Bitmap smaller = Bitmap.createScaledBitmap(bitmap,
+                    Math.max(1, Math.round(bitmap.getWidth() * scale)),
                     Math.max(1, Math.round(bitmap.getHeight() * scale)), true);
             if (smaller != bitmap) {
                 bitmap.recycle();
@@ -432,8 +522,8 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         int height = source.getIntrinsicHeight();
         if (width <= 0 || height <= 0) return source;      // a drawable without a size: leave it alone
         int max = maxBannerWidthPx();
-        if (width <= max) return source;                    // already small enough
-        float scale = max / (float) width;
+        if (width <= max && height <= max) return source;   // already small enough
+        float scale = max / (float) Math.max(width, height);
         int w = Math.max(1, Math.round(width * scale));
         int h = Math.max(1, Math.round(height * scale));
         Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);

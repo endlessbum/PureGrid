@@ -88,6 +88,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
@@ -115,6 +116,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private AppAdapter adapter;
     private RecyclerView grid;
+    /** "No apps" placeholder over the grid, shown when a rebuild produced zero tiles. */
+    private TextView emptyGrid;
     private FrameLayout root;
     private View ambient;
     private TextView heroName;
@@ -163,6 +166,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private final Runnable weatherClose = this::closeWeatherWindow;
     private final Runnable weatherFetch = this::fetchWeather;
     private View btnInputs;
+    /** Toggles the VPN when the remote's VPN key (HomeKeyService) broadcasts. While another app is
+     *  in front it only sends the toggle: bringing up UI from behind is blocked on Android 10+. */
+    private final BroadcastReceiver vpnToggleReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (hasWindowFocus()) openNetworkPill(); else toggleVpn();
+        }
+    };
+    /** Set when the remote's Inputs key (config.xml, inputs_key_*) launches the launcher: show the
+     *  Inputs dropdown once the top bar is laid out. */
+    private boolean pendingOpenInputs;
     private TextView btnWifi;
     private View btnClear;
     private AccountAvatarView btnAccount;
@@ -188,6 +202,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private int arrowSizePx = 0;
     private RecyclerView topOverlay;
     private SimpleAdapter topAdapter;
+    /** Bumps on every editor entry; an older candidate query never publishes over a newer one. */
+    private int overlayEpoch;
     private int topSelected = 0;
     private boolean editFocusTop = true;
     private boolean topActive = false;
@@ -219,10 +235,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** One waiting "dock parked" check: corrects the scroll to exactly 0 once the parking settles. */
     private RecyclerView.OnScrollListener dockParking;
     // Static so they survive the activity being destroyed while another app is open (low-memory TVs,
-    // or Developer options → "Don't keep activities"); they only reset when the process dies.
-    private int lastFocused = 0;
+    // or Developer options → "Don't keep activities"); they only reset when the process dies. The
+    // restore path tolerates a stale value: a key that no longer exists falls back to tile 0.
+    private static int lastFocused = 0;
     /** App of the last focused tile, so focus follows it when the app list changes. */
-    private String lastFocusedKey;
+    private static String lastFocusedKey;
     private float density;
     /** Module cards (res/values/config.xml, module_cards): discovered on resume, shown only after the owner's Show. */
     private boolean moduleCards;
@@ -234,6 +251,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      *  so exitEditMode can restore it without re-reading config.json from disk on the UI thread. */
     private List<String> storedDock = Collections.emptyList();
     private List<Cards.Card> cards = Collections.emptyList();
+    /** The last discovered card set, static like the focus slot above: a resume rebuild must not
+     *  put the module cards through PackageManager and certificate hashing inside a frame, so it
+     *  renders this cached set at once and swaps in what a background discovery returns. Resets
+     *  when the process dies — exactly when a fresh discovery is worth the wait anyway. */
+    private static List<Cards.Card> cardsCache = Collections.emptyList();
+    /** Bumped on every rebuild; a late Cards.discover answer from an older rebuild is dropped. */
+    private int tilesEpoch;
     /** The grid has been laid out and focused since the last resume; the card prompt waits for this. */
     private boolean tilesReady;
     private Dialog cardPrompt;
@@ -243,6 +267,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean rebuildOnResume = true;
     /** The Inputs or Module cards dropdown while one is open, so onPause can close it. */
     private PopupWindow openPopup;
+    // Crash protection: the install script disables the stock launcher, so an unhandled exception
+    // here would leave the TV without a working home screen at all. The handler below restarts
+    // the activity after a short backoff (via an alarm: the crash kills the process) and gives up
+    // after several rapid crashes, so a hopeless loop surfaces in logcat instead of spinning.
+    private static final java.util.Deque<Long> crashTimes = new java.util.ArrayDeque<>();
+    private static boolean crashHandlerInstalled;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     /** Refreshes the network pill when the connection changes: at boot Wi-Fi often connects after Home is shown. */
@@ -302,8 +332,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return;
             // The VPN badge depends on whether a VPN app is installed, so re-read that too.
             vpnInstalledCache = null;
+            warmVpnInstalled();
             handler.post(MainActivity.this::updateWifiLabel);
             if (Intent.ACTION_PACKAGE_ADDED.equals(action) || Intent.ACTION_PACKAGE_REMOVED.equals(action) || Intent.ACTION_PACKAGE_CHANGED.equals(action)) {
+                // A changed package may have changed its label: the tile-label cache must not
+                // outlive the package it was read from.
+                adapter.invalidateLabels();
                 reloadApps(false);
             }
         }
@@ -313,7 +347,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         public void run() {
             updateGreeting();
             sky.update();
-            handler.postDelayed(this, MINUTE_MS);
+            // Aligned to the wall-clock minute, not to "whenever resume happened": the date and
+            // the sky palette otherwise flip up to a minute after midnight.
+            handler.postDelayed(this, MINUTE_MS - System.currentTimeMillis() % MINUTE_MS);
         }
     };
     /** The boot-time network refreshes: re-posted while the connection settles, dropped in onPause. */
@@ -322,6 +358,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        installCrashRestart(getApplicationContext());
         // Keeps the screen on while the launcher itself is in front. onPause clears the flag (the
         // system may sleep while something else is on screen) and onResume takes it back, so it
         // follows the visible/not-visible cycle rather than the process's life. Это держит
@@ -334,7 +371,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         Config cfg = Config.load(this);
         COLUMNS = cfg.columns;
         animations = cfg.animations;
-        advancedEffects = cfg.animations && cfg.advancedEffects;
+        // Independent toggles in config.xml: turning animations off must not silently drag the
+        // separately-opted-in advanced effects with it.
+        advancedEffects = cfg.advancedEffects;
         reducedMotion = cfg.reducedMotion;
         liveTvPkg = cfg.liveTvPackage;
         liveTvAction = cfg.liveTvAction;
@@ -420,6 +459,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         fixedAccent = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE).getInt("accent_color", 0);
 
         grid = findViewById(R.id.grid);
+        emptyGrid = findViewById(R.id.emptyGrid);
         rtlAppGrid = getResources().getBoolean(R.bool.rtl_app_grid);
         // Mirror only the app grid; the header and other locales keep their own layouts.
         grid.setLayoutManager(new GridLayoutManager(this, COLUMNS) {
@@ -608,12 +648,27 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         grid.post(this::applyDockCentering);
 
         btnInputs = findViewById(R.id.btnInputs);
+        btnInputs.setOnClickListener(v -> showInputs());
         btnClear = findViewById(R.id.btnClear);
         btnSearch = findViewById(R.id.btnSearch);
         View btnSettings = findViewById(R.id.btnSettings);
         btnAccount = findViewById(R.id.btnAccount);
         applyTopBarVisibility();
-        btnInputs.setOnClickListener(v -> showInputs());
+        // The VPN key can arrive while another app is in front (HomeKeyService broadcasts it);
+        // NOT_EXPORTED keeps other apps from forging it, and the sender pins our own package.
+        IntentFilter vpnFilter = new IntentFilter("com.gathin.tvhome.ACTION_TOGGLE_VPN");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(vpnToggleReceiver, vpnFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(vpnToggleReceiver, vpnFilter);
+        }
+        // An Inputs key press that launched the launcher from the background lands here on a cold
+        // start; the warm path comes through onNewIntent.
+        Intent launch = getIntent();
+        if (launch != null && launch.getBooleanExtra("open_inputs", false)) {
+            pendingOpenInputs = true;
+            btnInputs.post(this::openPendingInputs);
+        }
         btnWifi.setOnClickListener(v -> openNetworkPill());
         btnWifi.setText("");
         btnWifi.setOnFocusChangeListener((v, hasFocus) -> {
@@ -632,6 +687,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return true;
         });
         btnSettings.setOnClickListener(v -> showSettingsMenu());
+        // The card prompt promises "hold OK on Settings, then choose Module cards": make the hold
+        // open the same menu, so the documented gesture actually works.
+        btnSettings.setOnLongClickListener(v -> {
+            showSettingsMenu();
+            return true;
+        });
         btnClear.setOnClickListener(v -> clearBackgroundProcesses());
         btnSearch.setOnClickListener(v -> startActivity(new Intent(this, SearchActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         // The account pill opens the system's accounts screen (the TV settings' "Accounts" entry);
@@ -667,9 +728,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // The top buttons keep their size: they already show focus by turning white, and a pill
         // that grows breaks the row of equal buttons in the bar.
 
-        // No GlassView – nothing to hide when focus leaves tiles.
-        // (Removed global focus listener that referenced GlassView.)
-
         packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
         packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
         packageFilter.addAction(Intent.ACTION_PACKAGE_CHANGED);
@@ -689,6 +747,42 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         handler.postDelayed(wifiRetry, 500);
         handler.postDelayed(wifiRetry, 2000);
         handler.postDelayed(wifiRetry, 5000);
+    }
+
+    /**
+     * Restarts the launcher after an uncaught exception: 2s, 4s, 8s, 16s of backoff, then no more.
+     * The alarm is the only vehicle that survives the crash itself (the process dies with it).
+     * After four crashes inside a minute the restarts stop — a build that crashes on every frame
+     * must not become a launcher-sized boot loop; logcat plus the tools/ scripts (or the held
+     * Home button, which HomeKeyService sends to the system Home picker) are the way out then.
+     */
+    private static void installCrashRestart(android.content.Context app) {
+        if (crashHandlerInstalled) return;
+        crashHandlerInstalled = true;
+        final Thread.UncaughtExceptionHandler system = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, thrown) -> {
+            android.util.Log.e("PureGrid", "launcher crashed", thrown);
+            try {
+                long now = android.os.SystemClock.elapsedRealtime();
+                while (!crashTimes.isEmpty() && now - crashTimes.peekFirst() > 60_000L) crashTimes.pollFirst();
+                crashTimes.addLast(now);
+                if (crashTimes.size() <= 4) {
+                    Intent restart = new Intent(app, MainActivity.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    android.app.PendingIntent pi = android.app.PendingIntent.getActivity(app, 1, restart,
+                            android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+                    android.app.AlarmManager am = (android.app.AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
+                    if (am != null) {
+                        // Inexact on purpose: setExact needs a permission on Android 12+, and a
+                        // restart a few hundred milliseconds late buys nothing here.
+                        am.set(android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                                now + (2_000L << Math.min(crashTimes.size() - 1, 3)), pi);
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            if (system != null) system.uncaughtException(thread, thrown);
+        });
     }
 
     /**
@@ -725,6 +819,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        // getIntent() must answer with the latest press, not with the launch-time one (only
+        // onCreate reads it today, but the next reader should not inherit a stale Intent).
+        setIntent(intent);
+        if (intent != null && intent.getBooleanExtra("open_inputs", false)) {
+            pendingOpenInputs = true;
+            btnInputs.post(this::openPendingInputs);
+        }
+        if (intent != null && intent.getBooleanExtra("collapse_all", false)) {
+            collapseAll();
+            lastFocused = 0;
+            lastFocusedKey = adapter.getItemCount() > 0 ? adapter.keyAt(0) : null;
+            handler.postDelayed(() -> focusTile(0, true), 50);
+        }
         if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return;
         // Home always collapses whatever is open (dock editor, popups, left buttons).
         boolean hadOverlay = editMode || leftButtonsVisible || openPopup != null;
@@ -738,6 +845,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         lastFocused = 0;
         lastFocusedKey = adapter.getItemCount() > 0 ? adapter.keyAt(0) : null;
         focusTile(0, true);
+    }
+
+    /** Shows the Inputs dropdown requested while the activity was in the background, once the top
+     *  bar is actually on screen: a popup anchored to an unmeasured view lands nowhere. */
+    private void openPendingInputs() {
+        if (!pendingOpenInputs) return;
+        pendingOpenInputs = false;
+        if (openPopup != null) collapseAll(); else showInputs();
     }
 
     /** Closes the dock editor, any popup and the left buttons; Home then lands on the first tile. */
@@ -771,8 +886,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // itself on screen — dark, and answering only the power button.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         promptsPaused = false;
-        // A VPN installed while Home was in the background changes the badge: re-read it.
-        vpnInstalledCache = null;
+        // A VPN installed while Home was in the background changes the badge: re-read it,
+        // off the UI thread (warmVpnInstalled refreshes the pill once the answer is in).
+        warmVpnInstalled();
         if (rebuildOnResume) {
             tilesReady = false;
             reloadApps(true);
@@ -836,43 +952,75 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             heroName.setAlpha(0f);
             ambient.setAlpha(0f);
         }
-        reloadTiles();
-        // The enter animation slides the tiles up from below; while focus is being restored the
-        // glow would sit at the exact spot while the tiles are still travelling, so it is skipped
-        // whenever the glow is about to be pinned on a tile again.
-        if (animate && animations && !reducedMotion && !restoreFocus) grid.scheduleLayoutAnimation();
+        reloadTiles(() -> {
+            // The enter animation slides the tiles up from below; while focus is being restored the
+            // glow would sit at the exact spot while the tiles are still travelling, so it is skipped
+            // whenever the glow is about to be pinned on a tile again.
+            if (animate && animations && !reducedMotion && !restoreFocus) grid.scheduleLayoutAnimation();
 
-        if (restoreFocus) {
-            // Follow the same app, or the nearest remaining slot when it was removed.
-            restoreFocus();
-        } else {
-            // A package change must not steal focus from a top button or the Inputs popup.
-            int pos = adapter.positionOf(returnKey);
-            lastFocused = Math.max(0, Math.min(pos >= 0 ? pos : returnSlot, adapter.getItemCount() - 1));
-            lastFocusedKey = adapter.keyAt(lastFocused);
-            if (pos < 0) hideHero();
-            // A newly installed app may have brought a card with it.
-            tilesReady = true;
-            showCardPrompt();
-        }
+            if (restoreFocus) {
+                // Follow the same app, or the nearest remaining slot when it was removed.
+                restoreFocus();
+            } else {
+                // A package change must not steal focus from a top button or the Inputs popup.
+                int pos = adapter.positionOf(returnKey);
+                lastFocused = Math.max(0, Math.min(pos >= 0 ? pos : returnSlot, adapter.getItemCount() - 1));
+                lastFocusedKey = adapter.keyAt(lastFocused);
+                if (pos < 0) hideHero();
+                // A newly installed app may have brought a card with it.
+                tilesReady = true;
+                showCardPrompt();
+            }
+        });
     }
 
     /**
      * Rebuilds the tiles; the module cards the owner chose to show stand in for their app's tile.
      * Every step into the card code runs under CardFeature: if it fails, the tiles are the ordinary
-     * ones and cards stay off for this process.
+     * ones and cards stay off for this process. The adapter builds its list off-thread (the app
+     * query is binder work), so {@code after} — anything that measures or focuses the fresh tiles —
+     * runs from the publish on the UI thread, not here.
      */
-    private void reloadTiles() {
-        // Read these before reload(): rebinding can move focus to the first tile and overwrite them.
+    private void reloadTiles(Runnable after) {
+        // Read these before the rebuild: rebinding can move focus to the first tile and overwrite them.
         final String returnKey = lastFocusedKey;
         final int returnSlot = lastFocused;
         final List<Cards.Card> none = Collections.emptyList();
-        cards = moduleCards ? CardFeature.run(() -> Cards.discover(this, hiddenApps, Cards.load(Cards.storeFile(this))), none) : none;
-        adapter.reload(cards.isEmpty() ? none : CardFeature.run(() -> Cards.shown(cards), none));
-        lastFocusedKey = returnKey;
-        lastFocused = returnSlot;
-        // A changed dock (add/remove/apply) must re-centre the bar even when the grid's bounds did not move.
-        grid.post(this::applyDockCentering);
+        // Cards.discover walks every installed app — PackageManager queries, metadata XML and
+        // certificate hashing, all of it binder calls on the main thread (ModuleCardsActivity
+        // deliberately runs the same thing off a thread). The grid rebinds here from the last
+        // discovered set, and what the fresh discovery finds swaps in below; the epoch keeps a
+        // slow answer from overwriting a rebuild that happened in the meantime.
+        final int epoch = ++tilesEpoch;
+        cards = moduleCards ? cardsCache : none;
+        adapter.reloadAsync(cards.isEmpty() ? none : CardFeature.run(() -> Cards.shown(cards), none), () -> {
+            if (isDestroyed()) return;
+            if (emptyGrid != null) emptyGrid.setVisibility(adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
+            lastFocusedKey = returnKey;
+            lastFocused = returnSlot;
+            // A changed dock (add/remove/apply) must re-centre the bar even when the grid's bounds did not move.
+            grid.post(this::applyDockCentering);
+            if (after != null) after.run();
+        });
+        if (!moduleCards) return;
+        backgroundExecutor.execute(() -> {
+            Map<String, Cards.Record> records =
+                    CardFeature.run(() -> Cards.load(Cards.storeFile(this)), Collections.emptyMap());
+            final List<Cards.Card> fresh = CardFeature.run(() -> Cards.discover(this, hiddenApps, records), none);
+            handler.post(() -> {
+                if (epoch != tilesEpoch || isDestroyed()) return;
+                cardsCache = fresh;
+                cards = fresh;
+                // No focus handwork here: the published set above already put focus where it
+                // belongs, and the swap must not yank it — the rebind keeps the tile focus holds
+                // if the tile survives, which is all a late card arrival owes the user.
+                adapter.reloadAsync(fresh.isEmpty() ? none : CardFeature.run(() -> Cards.shown(fresh), none), () -> {
+                    if (emptyGrid != null) emptyGrid.setVisibility(adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
+                    grid.post(this::applyDockCentering);
+                    showCardPrompt();
+                });
+            });
+        });
     }
 
     /**
@@ -900,6 +1048,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         ambient.animate().cancel();
         handler.removeCallbacks(minuteTick);
         handler.removeCallbacks(wifiRetry);
+        // The Wi-Fi/Ethernet glyph animations belong to a visible pill: a network callback can
+        // still fire while we are in the background and would otherwise keep ticking invisibly.
+        stopWifiAnimation();
+        stopEthAnimation();
         // The weather windows belong to a visible screen; coming back reschedules them in onResume.
         handler.removeCallbacks(weatherWindow);
         handler.removeCallbacks(weatherClose);
@@ -948,6 +1100,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // would otherwise sit parked until the process died.
         backgroundExecutor.shutdown();
         weatherExecutor.shutdown();
+        if (adapter != null) adapter.shutdown();
+        try { unregisterReceiver(vpnToggleReceiver); } catch (Exception ignored) {}
     }
 
     @Override
@@ -1005,23 +1159,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (event.getAction() == KeyEvent.ACTION_UP) open(systemIntent(Settings.ACTION_SETTINGS));
             return true;
         }
-        if (code == KeyEvent.KEYCODE_MENU && event.getAction() == KeyEvent.ACTION_UP) {
+        if (code == KeyEvent.KEYCODE_MENU && event.getAction() == KeyEvent.ACTION_UP
+                && openPopup == null && !editMode && !leftButtonsVisible) {
+            // "Only when nothing else wanted it", as the comment above promises: over a popup,
+            // the editor or the left bar the same key must not yank the settings on top.
             open(systemIntent(Settings.ACTION_SETTINGS));
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_BUTTON_16 && event.getAction() == KeyEvent.ACTION_UP) {
+            if (openPopup != null) collapseAll(); else showInputs();
             return true;
         }
         return super.dispatchKeyEvent(event);
     }
 
-    // ---- glass highlight -------------------------------------------------------------------------
-
-    /** Bounds of the glow as {x, y, width, height} in root coordinates, for this card and column. */
-
-    /** Moves the glow to these bounds without touching its animation state or alpha. */
-
     /**
-     * Pins the glow to the card that holds focus right now, at its true current position. Called
-     * on every scroll and after any layout change, so the glow can neither trail the tile nor
-     * linger somewhere else in the launcher.
+     * Pins the focus follow-up: the grid's scroll, the hero caption and the dock shelf react to
+     * the tile that holds focus right now. Called on every scroll and after any layout change,
+     * so nothing trails the tile or lingers somewhere else in the launcher.
      */
 
     @Override
@@ -2053,10 +2208,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (rawId == 0) return null;
             int cid = contactId(rawId);
             if (cid == 0) return null;
-            InputStream in = getContentResolver().openInputStream(ContentUris.withAppendedId(
-                    ContactsContract.Contacts.CONTENT_URI, cid).buildUpon()
-                    .appendPath(ContactsContract.Contacts.Photo.CONTENT_DIRECTORY).build());
-            Bitmap b = in != null ? BitmapFactory.decodeStream(in) : null;
+            Uri photoUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, cid).buildUpon()
+                    .appendPath(ContactsContract.Contacts.Photo.CONTENT_DIRECTORY).build();
+            // Downsample like every other picture here: the pill draws a few dozen pixels, and a
+            // full-size (or hostile multi-megabyte) contact photo must not decode at full size on
+            // a 1 GB TV. The contact stream is one-shot, so the bounds pass reopens the URI.
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            InputStream bin = getContentResolver().openInputStream(photoUri);
+            if (bin == null) return null;
+            BitmapFactory.decodeStream(bin, null, bounds);
+            bin.close();
+            if (bounds.outWidth <= 0 && bounds.outHeight <= 0) return null;
+            int sample = 1;
+            while (Math.max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 256) sample *= 2;
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = sample;
+            InputStream in = getContentResolver().openInputStream(photoUri);
+            Bitmap b = in != null ? BitmapFactory.decodeStream(in, null, opts) : null;
             if (in != null) in.close();
             return b;
         } catch (Exception ignored) {
@@ -2284,13 +2453,26 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     /**
-     * Whether the configured VPN app is installed. With no VPN app the network pill does not show a
-     * "VPN off" capsule at all; once the user installs one the badge appears as before.
+     * Whether the configured VPN app is installed — from the warmed cache only: the PackageManager
+     * query behind it is binder work, and the pill redraws on the UI thread. With no VPN app the
+     * network pill does not show a "VPN off" capsule at all; once the user installs one the badge
+     * appears as before. Until the first warm-up answers, the pill shows just the connection — the
+     * same it showed while the query would have been running on the main thread.
      */
     private boolean vpnInstalled() {
-        if (vpnInstalledCache != null) return vpnInstalledCache;
-        boolean installed = false;
-        if (!vpnApp.isEmpty()) {
+        Boolean cached = vpnInstalledCache;
+        return cached != null && cached;
+    }
+
+    /** Resolves whether the VPN app is installed, off the UI thread, and refreshes the pill when
+     *  the answer changes. Call wherever the cache is invalidated (resume, package broadcasts). */
+    private void warmVpnInstalled() {
+        if (vpnApp.isEmpty()) {
+            vpnInstalledCache = false;
+            return;
+        }
+        backgroundExecutor.execute(() -> {
+            boolean installed = false;
             PackageManager pm = getPackageManager();
             try {
                 pm.getPackageInfo(vpnApp, 0);
@@ -2310,9 +2492,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 } catch (Exception ignored) {
                 }
             }
-        }
-        vpnInstalledCache = installed;
-        return installed;
+            final boolean installedFinal = installed;
+            handler.post(() -> {
+                if (isDestroyed()) return;
+                boolean changed = vpnInstalledCache == null || vpnInstalledCache != installedFinal;
+                vpnInstalledCache = installedFinal;
+                if (changed) updateWifiLabel();
+            });
+        });
     }
 
     /**
@@ -2407,6 +2594,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void openSourcePanel() {
         Intent i = new Intent(sourcePanelAction);
         ComponentName c = ComponentName.unflattenFromString(sourcePanelService);
+        if (c == null && !sourcePanelAction.isEmpty()) {
+            // An action alone is not startable on API 26+ (implicit service calls throw): resolve
+            // the service that answers it and start that one explicitly.
+            try {
+                for (ResolveInfo ri : getPackageManager().queryIntentServices(i, 0)) {
+                    if (ri.serviceInfo != null) {
+                        c = new ComponentName(ri.serviceInfo.packageName, ri.serviceInfo.name);
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
         if (c != null) i.setComponent(c);
         try {
             startService(i);
@@ -2597,6 +2797,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         addSettingsMenuRow(rows, popup, R.string.system_settings, () -> open(systemIntent(Settings.ACTION_SETTINGS)));
         addSettingsMenuRow(rows, popup, R.string.launcher_settings, () -> startActivityForResult(
                 new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
+        // The card prompt's escape hatch: show/hide and inspect every installed module card.
+        if (moduleCards) {
+            addSettingsMenuRow(rows, popup, R.string.module_cards,
+                    () -> startActivity(new Intent(this, ModuleCardsActivity.class)));
+        }
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
         popup.setWidth(Math.max((int) (200 * density), panel.getMeasuredWidth()));
         dropIn(popup, panel, anchor, Gravity.END);
@@ -2684,8 +2889,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             decided[0] = true;
             cardPrompt = null;
             dialog.dismiss();
-            decideCard(card, v.getId() == R.id.btnShow);   // guards its own card calls; the tile reload stays outside
-            restoreFocus();   // the tiles changed under the prompt; this also chains the next prompt
+            decideCard(card, v.getId() == R.id.btnShow);   // restoreFocus happens after the store write landed
         };
         keep.setOnClickListener(choose);
         show.setOnClickListener(choose);
@@ -2707,14 +2911,35 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         keep.requestFocus();
     }
 
-    /** Writes the owner's decision and rebuilds the tiles; focus is left where it is. */
+    /** Writes the owner's decision and rebuilds the tiles; focus follows after the write landed. */
     private void decideCard(Cards.Card card, boolean show) {
-        boolean saved = CardFeature.run(() -> Cards.decide(Cards.storeFile(this), card, show), false);
-        if (!saved) {
-            Toast.makeText(this, R.string.card_not_saved, Toast.LENGTH_SHORT).show();
-            promptsPaused = true;
-        }
-        reloadTiles();
+        // The store write is small file I/O, and the reload reads the same file back — so both
+        // run in one background pass, in order, and the rebuild (with the next prompt chained
+        // through restoreFocus) waits for it instead of racing the write with a re-read.
+        backgroundExecutor.execute(() -> {
+            boolean saved = CardFeature.run(() -> Cards.decide(Cards.storeFile(this), card, show), false);
+            handler.post(() -> {
+                if (isDestroyed()) return;
+                if (!saved) {
+                    Toast.makeText(this, R.string.card_not_saved, Toast.LENGTH_SHORT).show();
+                    promptsPaused = true;
+                } else {
+                    // The cached set must carry the decision at once: otherwise the prompt loop
+                    // would re-ask the card it just got answered, and the tile would keep the old
+                    // state until the next discovery. The card is immutable, so it is rebuilt with
+                    // the new state — the same one discover() derives from the store just written.
+                    Cards.State state = show ? Cards.State.SHOWN : Cards.State.HIDDEN;
+                    List<Cards.Card> updated = new ArrayList<>(cardsCache.size());
+                    for (Cards.Card c : cardsCache) {
+                        updated.add(c.pkg.equals(card.pkg)
+                                ? new Cards.Card(c.pkg, c.component, c.label, c.appLabel, c.caption, c.accent, c.digest, state)
+                                : c);
+                    }
+                    cardsCache = updated;
+                }
+                reloadTiles(this::restoreFocus);   // the tiles changed under the prompt; this also chains the next prompt
+            });
+        });
     }
 
     private void toggleHideBelow() {
@@ -2743,16 +2968,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         
         adapter.editing = true;
         adapter.setHideBelow(true);
-        reloadTiles();
-        applyDockCentering();
-        positionLeftButtons();
-        buildTopOverlay();
-        if (topOverlay != null) {
-            topOverlay.setVisibility(View.VISIBLE);
-        }
-        grid.post(() -> {
-            focusTile(0, true);
-            scaleEditSlot();
+        reloadTiles(() -> {
+            applyDockCentering();
+            positionLeftButtons();
+            // buildTopOverlay publishes on the UI thread and shows the fresh overlay itself;
+            // showing the previous instance here would target a view about to be removed.
+            buildTopOverlay();
+            grid.post(() -> {
+                focusTile(0, true);
+                scaleEditSlot();
+            });
         });
     }
 
@@ -2884,14 +3109,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // list there — no config.json re-read on the UI thread).
         adapter.setFavourites(new ArrayList<>(storedDock));
         adapter.setHideBelow(hideBelow);
-        reloadTiles();
-        positionLeftButtons();
-        focusTile(0);
+        reloadTiles(() -> {
+            positionLeftButtons();
+            focusTile(0);
+        });
     }
 
     /** Places the Delete button centred under the dock slot being configured. */
     private void positionDeleteButton() {
         if (leftDeleteBtn == null) return;
+        // Only meaningful while a dock slot is grabbed in the editor. setLayoutParams below always
+        // triggers requestLayout, which fires this global layout listener again: without these
+        // guards it would relayout the whole tree at frame rate for the launcher's lifetime.
+        if (!editMode || leftDeleteBtn.getVisibility() != View.VISIBLE) return;
         if (grid.getWidth() <= 0) { grid.post(this::positionDeleteButton); return; }
         int inner = grid.getWidth() - grid.getPaddingLeft() - grid.getPaddingRight();
         int cell = COLUMNS > 0 ? inner / COLUMNS : inner;
@@ -2905,9 +3135,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         int gridTop = gl[1] - rl2[1];
         int cardLeft = gridLeft + grid.getPaddingLeft() + editSlot * cell + (cell - tileW) / 2;
         int cardTop = gridTop + grid.getPaddingTop() + (int) (14 * density);
+        int newLeft = cardLeft + (tileW - leftBtnSizePx) / 2;
+        int newTop = cardTop + tileH + (int) (22 * density);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) leftDeleteBtn.getLayoutParams();
-        lp.leftMargin = cardLeft + (tileW - leftBtnSizePx) / 2;
-        lp.topMargin = cardTop + tileH + (int) (22 * density);
+        if (lp.leftMargin == newLeft && lp.topMargin == newTop) return;   // no loop, like centerLeftButtons
+        lp.leftMargin = newLeft;
+        lp.topMargin = newTop;
         leftDeleteBtn.setLayoutParams(lp);
     }
 
@@ -2915,9 +3148,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void applyDockCentering() {
         int fullInner = grid.getWidth();
         if (fullInner <= 0) return;
-        int dockCount = editMode ? COLUMNS : adapter.getFavourites().size();
+        int dockCount = editMode ? COLUMNS : adapter.dockTileCount();
         int leftPad = 0, rightPad = 0;
-        if (dockCount > 0 && dockCount < COLUMNS) {
+        // Centre only a row that holds nothing but dock tiles. With a short dock the ordinary
+        // apps still flow into its row: padding built for the dock alone would shove those apps
+        // sideways, while the glass strip stays drawn under the dock tiles only — a half-centred
+        // mixed row. Left-aligned tiles keep the glass and the tiles in step.
+        boolean dockRowOnly = editMode || adapter.getItemCount() <= dockCount;
+        if (dockCount > 0 && dockCount < COLUMNS && dockRowOnly) {
             int cell = fullInner / COLUMNS;
             int pad = (fullInner - dockCount * cell) / 2;
             leftPad = pad;
@@ -2982,7 +3220,31 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void buildTopOverlay() {
         // Rebuilt on every entry into the editor: apps installed since the previous session would
-        // otherwise never show up as candidates until the home screen was recreated.
+        // otherwise never show up as candidates until the home screen was recreated. The query is
+        // binder work, so the package list is built off-thread and the overlay is assembled (and
+        // shown) from it on the UI thread; a newer request always wins via the epoch.
+        final int epoch = ++overlayEpoch;
+        backgroundExecutor.execute(() -> {
+            PackageManager pm = getPackageManager();
+            Intent probe = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+            List<String> found = new ArrayList<>();
+            for (ResolveInfo ri : pm.queryIntentActivities(probe, 0)) {
+                if (ri.activityInfo == null) continue;
+                String pkg = ri.activityInfo.packageName;
+                if (pkg.equals(getPackageName())) continue;
+                if (hiddenApps.contains(pkg)) continue;
+                found.add(pkg);
+            }
+            Collections.sort(found);
+            handler.post(() -> {
+                if (epoch != overlayEpoch || isDestroyed()) return;
+                buildTopOverlayNow(found);
+            });
+        });
+    }
+
+    /** The UI half of {@link #buildTopOverlay()}: assemble and show the candidate row. */
+    private void buildTopOverlayNow(List<String> pkgs) {
         if (topOverlay != null) {
             root.removeView(topOverlay);
             topOverlay = null;
@@ -2992,18 +3254,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         topOverlay.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         topOverlay.setItemAnimator(null);
         topOverlay.setFocusable(true);
-        List<String> pkgs = new ArrayList<>();
-        PackageManager pm = getPackageManager();
-        Intent probe = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
-        List<ResolveInfo> found = pm.queryIntentActivities(probe, 0);
-        for (ResolveInfo ri : found) {
-            if (ri.activityInfo == null) continue;
-            String pkg = ri.activityInfo.packageName;
-            if (pkg.equals(getPackageName())) continue;
-            if (hiddenApps.contains(pkg)) continue;
-            pkgs.add(pkg);
-        }
-        Collections.sort(pkgs);
         topAdapter = new SimpleAdapter(pkgs);
         topOverlay.setAdapter(topAdapter);
         // Match the real dock row exactly: same width, tile size and item layout, placed right above it.
@@ -3027,6 +3277,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (!pkgs.isEmpty()) editCandidate = pkgs.get(0);
         topAdapter.setSelected(0);
         topOverlay.scrollToPosition(0);
+        topOverlay.setVisibility(View.VISIBLE);
     }
 
     /** Simple adapter for the top overlay of installed apps. */
@@ -3077,22 +3328,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         @Override public void onBindViewHolder(H h, int pos) {
             String pkg = pkgs.get(pos);
-            Drawable icon = null, banner = null;
-            String label = pkg;
-            try {
-                PackageManager pm = getPackageManager();
-                ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-                icon = pm.getApplicationIcon(ai);
-                banner = ai.loadBanner(pm);
-                label = String.valueOf(pm.getApplicationLabel(ai));
-            } catch (Exception ignored) {
-            }
-            h.banner.setImageDrawable(banner);
-            h.banner.setVisibility(banner != null ? View.VISIBLE : View.GONE);
-            h.icon.setImageDrawable(icon);
-            h.icon.setVisibility(banner == null ? View.VISIBLE : View.GONE);
-            h.name.setText(Cards.cleanLabel(label, pkg));
-            h.name.setVisibility(View.INVISIBLE);   // the dock row has no captions
+            h.itemView.setTag(pkg);
             // Focus drives the enlargement, exactly like a dock tile (animated, with overshoot).
             float initScale = h.card.hasFocus() ? AppAdapter.FOCUS_SCALE : 1f;
             h.card.setScaleX(initScale);
@@ -3151,8 +3387,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         int dup = favs.indexOf(cand);
                         if (dup >= 0 && dup != editSlot) favs.set(dup, old);
                         adapter.setFavourites(favs);
-                    } else if (editSlot == favs.size() && favs.size() < COLUMNS && !favs.contains(cand)) {
-                        // Empty "+" slot: add the app instead of replacing.
+                    } else if (editSlot >= favs.size() && favs.size() < COLUMNS && !favs.contains(cand)) {
+                        // Empty "+" slot: add the app instead of replacing. Any "+" beyond the
+                        // first one adds to the first empty position — OK on it used to be a
+                        // dead press, which read as a broken remote.
                         favs.add(cand);
                         adapter.setFavourites(favs);
                     }
@@ -3164,6 +3402,77 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 }
                 return false;
             });
+            // Art comes from the cache or, on a miss, from the activity executor; bind itself never
+            // decodes a banner on the UI thread (the editor used to stall on every candidate).
+            Object[] cached = art.get(pkg);
+            if (cached != null) applyArt(h, pkg, cached);
+            else {
+                applyArt(h, pkg, null);
+                try {
+                    backgroundExecutor.submit(() -> {
+                        Drawable icon = null, banner = null;
+                        String label = pkg;
+                        try {
+                            PackageManager pm = getPackageManager();
+                            ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+                            icon = pm.getApplicationIcon(ai);
+                            // The tile shows this at a fraction of its real size; decoding (and
+                            // caching) a 1920x1080 banner per candidate is wasted heap on 1 GB TVs.
+                            banner = ai.loadBanner(pm);
+                            if (banner instanceof BitmapDrawable) {
+                                Bitmap src = ((BitmapDrawable) banner).getBitmap();
+                                int cap = 1024;
+                                if (src != null && src.getWidth() > cap) {
+                                    Bitmap small = Bitmap.createScaledBitmap(src, cap,
+                                            Math.max(1, Math.round(src.getHeight() * (cap / (float) src.getWidth()))), true);
+                                    banner = new BitmapDrawable(getResources(), small);
+                                }
+                            }
+                            label = String.valueOf(pm.getApplicationLabel(ai));
+                        } catch (Exception ignored) {
+                        }
+                        final Object[] loaded = new Object[] {icon, banner, label};
+                        art.put(pkg, loaded);
+                        runOnUiThread(() -> {
+                            // Only patch a view still bound to this package: the holder may have
+                            // been recycled onto another candidate while the load was in flight.
+                            if (pkg.equals(h.itemView.getTag())) applyArt(h, pkg, loaded);
+                        });
+                    });
+                } catch (java.util.concurrent.RejectedExecutionException ignored) {
+                    // The activity's executors retire in onDestroy; a dying editor shows placeholders.
+                }
+            }
+        }
+
+        /** Candidate art keyed by package, bounded by decoded bytes: the same budget the grid's
+         *  banner cache uses, for the same reason. */
+        private final android.util.LruCache<String, Object[]> art =
+                new android.util.LruCache<String, Object[]>(16 * 1024 * 1024) {
+                    @Override protected int sizeOf(String key, Object[] value) {
+                        int bytes = 0;
+                        for (Object o : value) {
+                            if (o instanceof BitmapDrawable && ((BitmapDrawable) o).getBitmap() != null) {
+                                bytes += ((BitmapDrawable) o).getBitmap().getAllocationByteCount();
+                            }
+                        }
+                        return Math.max(1, bytes);
+                    }
+                };
+
+        /** Sets a candidate's artwork: banner when there is one, icon otherwise; the label stays
+         *  invisible (the dock row has no captions) but still feeds the editor's replace. */
+        private void applyArt(H h, String pkg, Object[] art) {
+            Drawable banner = art == null ? null : (Drawable) art[1];
+            Drawable icon = art == null ? null : (Drawable) art[0];
+            String label = art == null ? pkg : (String) art[2];
+            if (icon == null && banner == null) icon = getDrawable(R.drawable.ic_placeholder_banner);
+            h.banner.setImageDrawable(banner);
+            h.banner.setVisibility(banner != null ? View.VISIBLE : View.GONE);
+            h.icon.setImageDrawable(icon);
+            h.icon.setVisibility(banner == null ? View.VISIBLE : View.GONE);
+            h.name.setText(Cards.cleanLabel(label, pkg));
+            h.name.setVisibility(View.INVISIBLE);   // the dock row has no captions
         }
         class H extends RecyclerView.ViewHolder {
             View card; ImageView banner, icon; TextView name;

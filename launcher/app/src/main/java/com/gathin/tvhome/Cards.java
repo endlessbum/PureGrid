@@ -213,12 +213,16 @@ final class Cards {
         Set<String> seen = new HashSet<>();
 
         int n = 0;
+        Set<String> claimed = new HashSet<>();   // packages whose first declared card was attempted
         for (ResolveInfo ri : declared) {
             if (++n > MAX_DECLARED) {
                 Log.w(TAG, "more than " + MAX_DECLARED + " cards declared; the rest are ignored");
                 break;
             }
             String pkg = ri.activityInfo != null ? ri.activityInfo.packageName : "?";
+            // One card per package, and it is the first one the system lists — even when that
+            // first one turns out invalid: a broken card must not promote a package's second one.
+            if (!claimed.add(pkg)) continue;
             try {
                 Card card = read(ctx, pm, ri, tiles, names, uiNames, hidden, seen, records);
                 seen.add(card.pkg);
@@ -713,7 +717,10 @@ final class Cards {
     static boolean quarantine(File file) {
         File bad = new File(file.getParentFile(), file.getName() + ".bad");
         if (bad.exists() && !bad.delete()) return false;
-        return file.renameTo(bad) || file.delete();
+        // Rename only: when the rename fails (permissions, a wedged filesystem) the evidence stays
+        // put rather than being deleted — recovery below reads the missing file as "no records",
+        // which is the safe outcome either way.
+        return file.renameTo(bad);
     }
 
     private static final String HEADER = "{\"version\":2,\"records\":[";

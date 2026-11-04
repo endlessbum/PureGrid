@@ -44,7 +44,9 @@
 
 - **Цепочки `pm`-команд** (`pm disable a; pm disable b`) могут молча оборваться после первой.
   Выполняйте по одной на вызов шелла; `--batch` делает ровно это.
-- **Большие передачи виснут** через Python-клиент. Для APK используйте `tools/b64push.py`.
+- **Большие передачи виснут** через Python-клиент. Для APK используйте `tools/b64push.py`;
+  при прямом вызове из Git Bash задайте `MSYS_NO_PATHCONV=1` (скрипты-обёртки ставят его
+  сами, прямому вызову неоткуда).
 - **`adb exec-out screencap -p` отдаёт битый PNG** на части MediaTek-устройств Xiaomi: бинарник
   сначала печатает в stdout `Init wrapper sys mutex successful`. Сохраняйте на ТВ и читайте файл:
   `screencap -p /data/local/tmp/s.png`.
@@ -100,7 +102,9 @@
   телевизор выбрал соседнюю зону, а старые прошивки везут данные часовых поясов, устаревшие ещё до
   отмены летнего времени в Иране в 2022-м (на Android 10 и новее проверьте:
   `tools/tv.py 'cat /apex/com.android.tzdata/etc/tz/tz_version'`). Задайте зону вручную:
-  `tools/tv.py 'settings put global auto_time_zone 0; cmd alarm set-timezone Asia/Tehran'`.
+  `tools/tv.py 'settings put global auto_time_zone 0'`, затем
+  `tools/tv.py 'cmd alarm set-timezone Asia/Tehran'` (по одной команде на вызов — как
+  и для `pm`; цепочка здесь приведена только как история проблемы).
   Если весной часы убегают на час вперёд, удержит фиксированный сдвиг:
   `tools/tv.py 'cmd alarm set-timezone GMT+03:30'`. То же верно для любой страны, чьи правила
   поменялись позже сборки прошивки.

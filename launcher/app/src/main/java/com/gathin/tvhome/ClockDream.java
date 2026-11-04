@@ -70,12 +70,16 @@ public class ClockDream extends DreamService {
     @Override
     public void onDreamingStopped() {
         handler.removeCallbacks(tick);
+        content.animate().cancel();
+        if (glowAnim != null) glowAnim.cancel();
         super.onDreamingStopped();
     }
 
     @Override
     public void onDetachedFromWindow() {
         handler.removeCallbacks(tick);
+        content.animate().cancel();
+        if (glowAnim != null) glowAnim.cancel();
         super.onDetachedFromWindow();
     }
 
@@ -104,11 +108,16 @@ public class ClockDream extends DreamService {
     private void shiftGlow() {
         int from = glowColor;
         colorIndex = (colorIndex + 1) % PALETTE.length;
-        ValueAnimator anim = ValueAnimator.ofObject(new ArgbEvaluator(), from, PALETTE[colorIndex]);
-        anim.setDuration(8000);
-        anim.addUpdateListener(a -> setGlow((int) a.getAnimatedValue()));
-        anim.start();
+        if (glowAnim != null) glowAnim.cancel();
+        glowAnim = ValueAnimator.ofObject(new ArgbEvaluator(), from, PALETTE[colorIndex]);
+        glowAnim.setDuration(8000);
+        glowAnim.addUpdateListener(a -> setGlow((int) a.getAnimatedValue()));
+        glowAnim.start();
     }
+
+    /** Kept so a shift that runs into onDreamingStopped can be cancelled instead of drawing an
+     *  8-second fade into an already-dismissed window. */
+    private ValueAnimator glowAnim;
 
     private void setGlow(int color) {
         glowColor = color;

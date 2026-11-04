@@ -39,9 +39,16 @@ if printf '%s\n' "$PKGS" | grep -x "$SETUP" >/dev/null && [ -z "${FORCE_SETUPWRA
     echo "network and take the TV off Wi-Fi. On the TV, forget the network and join it again in" >&2
     echo "Settings > Network & Internet, then run this again (or set FORCE_SETUPWRAITH=1 on Ethernet)." >&2
     PKGS="$(printf '%s\n' "$PKGS" | grep -vx "$SETUP" || true)"
+  elif [ -z "$WIFI" ]; then
+    # Fail closed, not open: an unreadable probe must not wave setupwraith through the guard.
+    echo "ERROR: could not read the Wi-Fi state (empty dumpsys), so the setupwraith guard could not" >&2
+    echo "check who owns the saved network. Restore the connection and re-run, or set" >&2
+    echo "FORCE_SETUPWRAITH=1 to disable it anyway (Ethernet, or you know the network is safe)." >&2
+    exit 1
   fi
 fi
 
+BATCH_EXIT=0
 {
   [ -n "$PKGS" ] && printf '%s\n' "$PKGS" | sed 's/^/pm disable-user --user 0 /'
   # pm disable-user only switches the components off; a process that was already up keeps running.
@@ -50,4 +57,9 @@ fi
   # manager refuses to kill those - so only a system rebuild (not a reboot) clears them.
   [ -n "$PKGS" ] && printf '%s\n' "$PKGS" | sed 's/^/am force-stop /'
   echo "pm list packages -d"
-} | "$PY" -I tools/tv.py --batch
+} | "$PY" -I tools/tv.py --batch || BATCH_EXIT=$?
+if [ "$BATCH_EXIT" -ne 0 ]; then
+  echo "WARNING: some commands answered Error/Failure (see the batch summary above); the list may be" >&2
+  echo "half-applied. The script is idempotent — re-run it to retry the failed entries." >&2
+fi
+exit "$BATCH_EXIT"

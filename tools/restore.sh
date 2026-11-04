@@ -30,6 +30,7 @@ if [ -n "$BAD" ]; then
   { echo "refusing $LIST: not a package name:"; printf '%s\n' "$BAD" | sed 's/^/  /'; } >&2
   exit 1
 fi
+BATCH_EXIT=0
 {
   [ -n "$PKGS" ] && printf '%s\n' "$PKGS" | sed 's/^/pm enable /'
   echo "pm enable $STOCK"
@@ -39,4 +40,18 @@ fi
   echo "settings put global transition_animation_scale 1.0"
   echo "settings put global animator_duration_scale 1.0"
   echo "pm list packages -d"
-} | "$PY" -I tools/tv.py --batch
+} | "$PY" -I tools/tv.py --batch || BATCH_EXIT=$?
+if [ "$BATCH_EXIT" -ne 0 ]; then
+  echo "WARNING: some commands answered Error/Failure (see the batch summary above). Check where Home" >&2
+  echo "resolves to: TV_HOST=<tv> tools/tv.py 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME'" >&2
+  echo "(see docs/TROUBLESHOOTING.md for the 'choose a Home app' screen after a restore)." >&2
+fi
+# Where Home actually points after the restore: set-home-activity can silently fail to stick
+# (e.g. the stock launcher was reinstalled and its component does not resolve). A NOTE, not an
+# error — the restore itself worked; this just says the last step out loud. The probe is best
+# effort: a dead connection here must not fail the whole restore.
+HOME_NOW=$(("$PY" -I tools/tv.py 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME' 2>/dev/null || true) | tail -n 1 | tr -d '\r' | cut -d/ -f1)
+if [ "$HOME_NOW" != "$STOCK" ]; then
+  echo "NOTE: Home now resolves to '${HOME_NOW:-nothing}', not $STOCK. Run the set-home-activity line by hand, or see docs/TROUBLESHOOTING.md." >&2
+fi
+exit "$BATCH_EXIT"

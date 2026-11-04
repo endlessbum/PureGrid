@@ -19,7 +19,8 @@ final class Shamsi {
         return j[2] + " " + MONTHS[j[1] - 1] + " " + j[0];
     }
 
-    /** Gregorian to Jalali, the 33-year-cycle algorithm used by jalaali-js. Returns {year, month, day}. */
+    /** Gregorian to Jalali, the classic 33-year-cycle algorithm (Pournader/Toossi). Exact for
+ *  AP 1178-1468 (~1799-2089 CE), which is far beyond any TV's clock; returns {year, month, day}. */
     static int[] toJalali(int gy, int gm, int gd) {
         int[] monthStart = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
         int gy2 = gm > 2 ? gy + 1 : gy;

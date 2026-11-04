@@ -8,6 +8,10 @@
     <string name="account">Аккаунт Google</string>
     <string name="clear">Очистка</string>
     <string name="search">Поиск</string>
+    <string name="search_section_apps">Приложения</string>
+    <string name="search_empty">Ничего не найдено</string>
+    <!-- Когда ни одно установленное приложение не отдаёт контент в поиск: строк контента не будет вовсе. -->
+    <string name="search_no_content_hint">Установленные приложения не отдают контент в поиск</string>
     <string name="cleared_apps">Закрыто %1$d приложений</string>
     <string name="cleaning_started">Очистка запущена</string>
     <string name="cleaning_unavailable">На Android 14 и новее система не позволяет сторонним приложениям завершать фоновые процессы других приложений</string>
@@ -118,4 +122,5 @@
     <string name="section_theme_system">Тема и система</string>
     <string name="on">Вкл.</string>
     <string name="off">Выкл.</string>
+    <string name="empty_grid">Пока нет приложений — установите что-нибудь из магазина или посмотрите скрытые в настройках лаунчера</string>
 </resources>

@@ -307,6 +307,17 @@
                 android:overScrollMode="never"
                 android:scrollbars="none"
                 android:descendantFocusability="afterDescendants" />
+
+            <!-- Same placeholder as the base layout; parity is checked by LayoutParityTest. -->
+            <TextView
+                android:id="@+id/emptyGrid"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="@string/empty_grid"
+                android:textColor="@color/pill_text"
+                android:textSize="16sp"
+                android:visibility="gone" />
         </FrameLayout>
     </LinearLayout>
 </FrameLayout>

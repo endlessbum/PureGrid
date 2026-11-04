@@ -6,6 +6,8 @@
     android:paddingStart="56dp"
     android:paddingEnd="56dp"
     android:paddingTop="26dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:background="#FF000000">
 
     <EditText
@@ -15,15 +17,34 @@
         android:hint="@string/search"
         android:textColor="#FFFFFFFF"
         android:textColorHint="#8CFFFFFF"
-        android:background="@drawable/glass_panel"
+        android:background="@drawable/search_input_bg"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         android:textSize="16sp"
         android:fontFamily="@font/outfit_medium" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/searchList"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="16dp" />
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/searchList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="12dp"
+            android:clipChildren="false"
+            android:clipToPadding="false" />
+
+        <TextView
+            android:id="@+id/searchEmpty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"
+            android:textColor="#8CFFFFFF"
+            android:textSize="14sp"
+            android:fontFamily="@font/outfit" />
+    </FrameLayout>
 </LinearLayout>

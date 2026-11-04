@@ -1,5 +1,6 @@
 # Windows version of theme.sh: push a theme folder (config.json and optionally wallpaper.jpg) to the
-# launcher on the TV and restart Home. See themes/README.md for the keys.
+# launcher on the TV and restart Home. The keys are documented in the comments of
+# launcher/app/src/main/res/values/config.xml (there is no themes/ folder in the repo).
 #
 # Usage: tools\theme.ps1 -TvHost 192.168.1.50 themes\aurora
 #        tools\theme.ps1 -TvHost 192.168.1.50 -Reset
@@ -26,7 +27,10 @@ $revision = [guid]::NewGuid().ToString('N')
 $restart = "a=`$(settings get secure enabled_accessibility_services); am force-stop $pkg; case `"`$a`" in *$pkg*) sleep 1; settings put secure enabled_accessibility_services `"`$a`"; settings put secure accessibility_enabled 1 ;; esac; am start -n $pkg/.MainActivity >/dev/null"
 
 if ($Reset) {
-    & $py -I tv.py "mkdir -p $dir; rm -f $dir/config.json $dir/wallpaper.jpg; printf '%s' '$revision' > $dir/theme_revision; $restart; echo reset"
+    # Only the marker line is interesting (parity with theme.sh's tail -n 1); a refusal still
+    # shows through the exit-code check, and tv.py's own error text stays on stderr.
+    (& $py -I tv.py "mkdir -p $dir; rm -f $dir/config.json $dir/wallpaper.jpg; printf '%s' '$revision' > $dir/theme_revision; $restart; echo reset") | Select-Object -Last 1
+    if ($LASTEXITCODE -ne 0) { throw "the TV refused the reset (exit $LASTEXITCODE)" }
     exit 0
 }
 if (-not $Theme) { throw 'usage: theme.ps1 <theme folder> | -Reset' }

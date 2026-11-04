@@ -3,7 +3,8 @@
 # restart Home so it picks it up. The launcher reads the files from its external files directory and
 # overlays config.json on its built-in config.xml; the keys are the ones commented there.
 #
-# Usage: TV_HOST=192.168.1.50 tools/theme.sh themes/aurora
+# Usage: TV_HOST=192.168.1.50 tools/theme.sh themes/aurora   (any folder with a config.json; there
+#                                                     is no themes/ folder in the repo)
 #        TV_HOST=192.168.1.50 tools/theme.sh --reset        # remove the overlay, back to config.xml
 set -euo pipefail
 # Resolve the theme folder against the caller's directory before moving into tools/.

@@ -10,6 +10,10 @@
     <string name="account">Google account</string>
     <string name="clear">Clear</string>
     <string name="search">Search</string>
+    <string name="search_section_apps">Apps</string>
+    <string name="search_empty">Nothing found</string>
+    <!-- Shown when no installed app exports a search provider: content rows cannot exist at all. -->
+    <string name="search_no_content_hint">Installed apps offer no content to search</string>
     <string name="choose_input">Inputs</string>
     <string name="connected">Connected</string>
     <string name="standby">Standby</string>
@@ -122,4 +126,5 @@
     <string name="card_state_new">New</string>
     <string name="card_state_new_key">New key</string>
     <string name="card_state_new_label">New name</string>
+    <string name="empty_grid">No apps yet — install something from the store, or check hidden apps in Launcher settings</string>
 </resources>

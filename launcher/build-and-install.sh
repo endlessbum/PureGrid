@@ -56,6 +56,16 @@ if [ -z "${STOCK_LAUNCHER:-}" ]; then
       fi ;;
   esac
 fi
+# The value is pasted into shell commands on the TV below (pm disable-user/pm enable, the recovery
+# file), exactly like restore.sh's STOCK and the debloat list entries: only a package name, or
+# "none". A typo like "launcher; reboot" must be refused here, not executed on the TV.
+case "$STOCK_LAUNCHER" in
+  none) ;;
+  *)
+    if ! printf '%s' "$STOCK_LAUNCHER" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$'; then
+      echo "refusing STOCK_LAUNCHER='$STOCK_LAUNCHER': not a package name" >&2; exit 1
+    fi ;;
+esac
 echo "Stock launcher: $STOCK_LAUNCHER"
 HOME_QUERY='cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME'
 if [ "$STOCK_LAUNCHER" = none ]; then DISABLE_STOCK="echo stock launcher left alone"
@@ -70,6 +80,15 @@ case "$OUT" in
   *Success*) ;;
   *) echo "ERROR: pm install failed; the stock launcher was left untouched." >&2; exit 1 ;;
 esac
+# Claim Home before anything else is touched (same order as build-and-install.ps1): Android drops
+# the home preference whenever the set of HOME apps changes, so setting it while the stock launcher
+# is still enabled narrows the window where no default exists. A failure here is fatal: the batch
+# below would disable the stock launcher with no working Home to fall back to.
+SET_OUT=$("$PY" -I ../tools/tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity')
+echo "$SET_OUT"
+case "$SET_OUT" in
+  *Error*) echo "ERROR: could not set the new launcher as home; the stock launcher was left untouched." >&2; exit 1 ;;
+esac
 # Start the launcher on its own, before the stock Home is touched. In the batch below a start that
 # fails only prints an "Error:" line, and the stock launcher would be disabled anyway, leaving the TV
 # with no usable Home (#239). "Status: ok" from `am start -W` means the activity really came up;
@@ -82,15 +101,26 @@ if ! printf '%s' "$START_OUT" | grep -qF 'Status: ok' || printf '%s' "$START_OUT
   echo "ERROR: the new launcher did not start (see above); $STOCK_LAUNCHER was left enabled." >&2
   exit 1
 fi
-printf '%s\n' \
-  "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted" \
-  "pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; echo secure-granted" \
-  "pm grant com.gathin.tvhome android.permission.GET_ACCOUNTS 2>/dev/null; echo account-granted" \
-  "pm grant com.gathin.tvhome android.permission.READ_CONTACTS 2>/dev/null; echo contacts-granted" \
+BATCH_OUT=$(printf '%s\n' \
+  "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null && echo location-granted || echo location-grant-failed" \
+  "pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS 2>/dev/null && echo secure-granted || echo secure-grant-failed" \
+  "pm grant com.gathin.tvhome android.permission.GET_ACCOUNTS 2>/dev/null && echo account-granted || echo account-grant-failed" \
+  "pm grant com.gathin.tvhome android.permission.READ_CONTACTS 2>/dev/null && echo contacts-granted || echo contacts-grant-failed" \
   "cmd package compile -m speed -f com.gathin.tvhome" \
   "$DISABLE_STOCK" \
   "cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity" \
-  | "$PY" -I ../tools/tv.py --batch
+  | "$PY" -I ../tools/tv.py --batch || true)
+echo "$BATCH_OUT"
+# A marker must match as a whole output line: the batch also echoes the command itself, whose
+# text contains "location-grant-failed" even when the grant succeeded.
+if printf '%s\n' "$BATCH_OUT" | grep -qE '^(location|secure|account|contacts)-grant-failed[[:space:]]*$'; then
+  echo "WARNING: some permissions were not granted (markers above). The launcher still works, but the features behind them degrade silently:" >&2
+  echo "weather by location falls back to IP, the account pill keeps the mono letter." >&2
+fi
+# The `|| true` above matters: a lost connection aborts the batch midway (tv.py exits with an
+# exception), and with `set -euo pipefail` that would kill the script before the query below could
+# notice the half-done switch and roll the stock launcher back — exactly when the TV might be left
+# with the stock launcher disabled and no home preference set.
 
 # Home's owner, or an empty string when the TV cannot be reached (pipefail would otherwise make a
 # lost connection abort the script with no explanation).
@@ -129,7 +159,7 @@ rollback_home() {
 # Order matters: the new launcher is started before the stock one is disabled, and the home
 # preference is set after. Android drops the preference whenever the set of HOME apps changes, and
 # on Google TV 14 the next candidate is the setup wizard's RecoveryActivity, which crash-loops
-# system_server (see examples/xiaomi-tv-a-pro-2026). So check where Home ended up, and put the
+# system_server (see docs/TROUBLESHOOTING.md, "Xiaomi MiTV-MZTU0"). So check where Home ended up, and put the
 # stock launcher back if it is not ours.
 HOME_NOW=$(query_home)
 case "$HOME_NOW" in

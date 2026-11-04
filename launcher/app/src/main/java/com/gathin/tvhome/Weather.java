@@ -159,12 +159,48 @@ final class Weather {
         } catch (Exception ignored) {
         }
         try {
+            // The IP lookup is a third-party call: reuse its answer for a day before asking again.
+            double[] cached = cachedCoords(ctx);
+            if (cached != null) return cached;
             String resp = http("https://ipapi.co/json/", null, null);
             if (resp == null) return null;
             JSONObject o = new JSONObject(resp);
-            return new double[]{o.getDouble("latitude"), o.getDouble("longitude")};
+            double[] out = new double[]{o.getDouble("latitude"), o.getDouble("longitude")};
+            rememberCoords(ctx, out);
+            return out;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    /** Where the IP lookup landed, so a TV without a location fix does not phone ipapi.co on
+     *  every refresh: the fallback coordinates are reused for a day, then re-asked once. */
+    private static final String COORDS_PREF = "weather_ip_coords";
+    private static final long COORDS_TTL_MS = 24 * 60 * 60 * 1000L;
+
+    private static double[] cachedCoords(Context ctx) {
+        try {
+            android.content.SharedPreferences p =
+                    ctx.getSharedPreferences(COORDS_PREF, Context.MODE_PRIVATE);
+            long at = p.getLong("at", 0);
+            if (System.currentTimeMillis() - at > COORDS_TTL_MS) return null;
+            double lat = Double.longBitsToDouble(p.getLong("lat", 0));
+            double lon = Double.longBitsToDouble(p.getLong("lon", 0));
+            if (lat == 0 && lon == 0) return null;
+            return new double[]{lat, lon};
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static void rememberCoords(Context ctx, double[] coords) {
+        try {
+            ctx.getSharedPreferences(COORDS_PREF, Context.MODE_PRIVATE).edit()
+                    .putLong("at", System.currentTimeMillis())
+                    .putLong("lat", Double.doubleToLongBits(coords[0]))
+                    .putLong("lon", Double.doubleToLongBits(coords[1]))
+                    .apply();
+        } catch (Exception ignored) {
         }
     }
 
@@ -186,7 +222,10 @@ final class Weather {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             try (InputStream in = c.getInputStream()) {
                 byte[] buf = new byte[4096];
-                for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+                // Capped: a broken proxy answering with gigabytes must not fill the heap; the
+                // biggest honest answer here is a couple of kilobytes of JSON.
+                int cap = 256 * 1024;
+                for (int n; out.size() < cap && (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
             }
             return new String(out.toByteArray(), StandardCharsets.UTF_8);
         } catch (Exception e) {
@@ -203,6 +242,8 @@ final class Weather {
             case "partly-cloudy": return R.string.condition_partly_cloudy;
             case "cloudy": return R.string.condition_cloudy;
             case "overcast": return R.string.condition_overcast;
+            case "fog": return R.string.condition_fog;
+            case "drizzle": return R.string.condition_light_rain;   // морось
             case "light-rain": return R.string.condition_light_rain;
             case "rain": return R.string.condition_rain;
             case "heavy-rain": return R.string.condition_heavy_rain;

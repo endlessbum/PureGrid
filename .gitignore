@@ -11,3 +11,5 @@ backup_*/
 desktop.ini
 Thumbs.db
 puregrid-analysis/
+
+.zcode/

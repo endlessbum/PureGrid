@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One horizontal strip of search results: the row title and the cards. Children may draw
+     outside their bounds (the focus zoom), so nothing here clips. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="10dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <TextView
+        android:id="@+id/rowTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_marginBottom="8dp"
+        android:textColor="#B3FFFFFF"
+        android:textSize="14sp"
+        android:fontFamily="@font/outfit_medium"
+        android:letterSpacing="0.02" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rowItems"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:overScrollMode="never" />
+</LinearLayout>

@@ -65,13 +65,17 @@ final class Config {
     final File wallpaper;
     /** Whether the overlay file was present and parsed. */
     final boolean overlayApplied;
+    /** Content search: rows asked from each search-provider app per query (search_provider_limit). */
+    final int searchProviderLimit;
+    /** Content search: how long one provider may take to answer, ms (search_provider_timeout_ms). */
+    final int searchProviderTimeoutMs;
 
     private Config(List<String> dockApps, List<String> hiddenApps, String liveTvPackage, String liveTvAction,
                    String sourcePanelService, String sourcePanelAction, String inputAction,
                    int columns, int rowsBelowDock, boolean animations, boolean advancedEffects,
                    boolean shamsiDate, boolean moduleCards, boolean reducedMotion, String vpnApp,
                    String vpnToggleAction, boolean showHomeSettingsShortcut, int backgroundColor, int skyIntensity,
-                   File wallpaper, boolean overlayApplied) {
+                   File wallpaper, boolean overlayApplied, int searchProviderLimit, int searchProviderTimeoutMs) {
         this.dockApps = Collections.unmodifiableList(dockApps);
         this.hiddenApps = Collections.unmodifiableList(hiddenApps);
         this.liveTvPackage = liveTvPackage;
@@ -93,6 +97,8 @@ final class Config {
         this.skyIntensity = skyIntensity;
         this.wallpaper = wallpaper;
         this.overlayApplied = overlayApplied;
+        this.searchProviderLimit = searchProviderLimit;
+        this.searchProviderTimeoutMs = searchProviderTimeoutMs;
     }
 
     /** The folder the theme tools push into; null when external storage is unavailable. */
@@ -121,6 +127,8 @@ final class Config {
         boolean homeSettings = res.getBoolean(R.bool.show_home_settings_shortcut);
         int background = 0xFF000000;
         int skyIntensity = res.getInteger(R.integer.sky_intensity);
+        int searchLimit = res.getInteger(R.integer.search_provider_limit);
+        int searchTimeout = res.getInteger(R.integer.search_provider_timeout_ms);
         boolean applied = false;
 
         File dir = dir(ctx);
@@ -151,23 +159,21 @@ final class Config {
             homeSettings = bool(json, "show_home_settings_shortcut", homeSettings);
             background = color(json, "background_color", background);
             skyIntensity = integer(json, "sky_intensity", skyIntensity, 0, 100);
+            searchLimit = integer(json, "search_provider_limit", searchLimit, 1, 40);
+            searchTimeout = integer(json, "search_provider_timeout_ms", searchTimeout, 300, 15_000);
         }
         // A theme push or reset invalidates choices made on the TV. On first use, remember the
         // current theme without clearing choices from an older launcher version.
         SharedPreferences choices = ctx.getSharedPreferences(SETTINGS_NAME, Context.MODE_PRIVATE);
         syncThemeChoices(choices, dir, file);
         // Dock order edited on the TV (left-bar settings) overrides the theme default.
-        String chosenDock = choices.getString("dock_apps", null);
-        if (chosenDock != null && !chosenDock.trim().isEmpty()) {
-            List<String> parsed = new ArrayList<>();
-            for (String p : chosenDock.split(",")) {
-                p = p.trim();
-                if (!p.isEmpty()) parsed.add(p);
-            }
-            if (!parsed.isEmpty()) dock = parsed;
-        }
+        List<String> parsed = parseChosenDock(choices.getString("dock_apps", null));
+        if (parsed != null) dock = parsed;
         int chosenColumns = choices.getInt("columns", columns);
-        if (chosenColumns >= 4 && chosenColumns <= 7) columns = chosenColumns;
+        // The same clamp as a theme's "columns": the picker on the TV offers 4..7, but a stored
+        // value outside that must not silently fall back to the theme default while the same
+        // number in config.json would have been accepted.
+        if (chosenColumns >= 1 && chosenColumns <= 8) columns = chosenColumns;
         animations = choices.getBoolean("animations", animations);
         advancedEffects = choices.getBoolean("advanced_effects", advancedEffects);
         File wallpaper = dir != null ? new File(dir, WALLPAPER_NAME) : null;
@@ -180,7 +186,32 @@ final class Config {
         return new Config(dock, hidden, liveTv, liveTvAction, panelService, panelAction, inputAction,
                 Math.max(1, columns), Math.max(0, rowsBelow), animations, advancedEffects,
                 shamsi, moduleCards, reducedMotion, vpn, vpnToggle, homeSettings, background,
-                Math.max(0, Math.min(100, skyIntensity)), wallpaper, applied);
+                Math.max(0, Math.min(100, skyIntensity)), wallpaper, applied,
+                searchLimit, searchTimeout);
+    }
+
+    /** True when the theme on disk changed (or first appeared) and the layout choices made on the
+     *  TV — columns, animations, advanced effects — must be cleared so they cannot fight the new
+     *  theme. {@code seen} is the stored signature (null: first use), {@code signature} the
+     *  current one, {@code token} the theme_revision marker ("absent" when the tools never wrote one). */
+    static boolean themeChanged(String seen, String signature, String token) {
+        if (seen == null) {
+            // Existing preferences survive an app upgrade; only an explicit theme push or reset
+            // by the updated tools clears them on first use.
+            return !"absent".equals(token);
+        }
+        return !seen.equals(signature);
+    }
+
+    /** The dock order edited on the TV ("pkg,pkg") as a list; null when nothing usable is stored. */
+    static List<String> parseChosenDock(String chosen) {
+        if (chosen == null || chosen.trim().isEmpty()) return null;
+        List<String> out = new ArrayList<>();
+        for (String p : chosen.split(",")) {
+            p = p.trim();
+            if (!p.isEmpty()) out.add(p);
+        }
+        return out.isEmpty() ? null : out;
     }
 
     private static void syncThemeChoices(SharedPreferences choices, File dir, File config) {
@@ -188,25 +219,32 @@ final class Config {
         String token = revisionToken(revision);
         String signature = fileStamp(config) + ":" + token;
         String seen = choices.getString(THEME_SIGNATURE_KEY, null);
-        if (seen == null) {
-            // Existing preferences survive an app upgrade, unless the first launch follows an
-            // explicit theme push or reset by the updated tools. apply(): the reads below and in
-            // the rest of load() hit the in-memory cache either way, the disk write can wait.
-            SharedPreferences.Editor editor = choices.edit();
-            if (!"absent".equals(token)) editor.remove("columns").remove("animations")
-                    .remove("advanced_effects");
-            editor.putString(THEME_SIGNATURE_KEY, signature).apply();
-        } else if (!seen.equals(signature)) {
-            choices.edit().remove("columns").remove("animations").remove("advanced_effects")
-                    .putString(THEME_SIGNATURE_KEY, signature).apply();
+        boolean reset = themeChanged(seen, signature, token);
+        if (!reset && seen != null) return;   // nothing changed: no writes at all
+        // apply(): the reads below and in the rest of load() hit the in-memory cache either way,
+        // the disk write can wait.
+        SharedPreferences.Editor editor = choices.edit();
+        if (reset) editor.remove("columns").remove("animations").remove("advanced_effects");
+        editor.putString(THEME_SIGNATURE_KEY, signature).apply();
+    }
+
+    /** Size + mtime, plus a short content hash; package-visible for the JVM tests. */
+    static String fileStamp(File file) {
+        if (file == null || !file.isFile()) return "absent";
+        // Size + mtime, plus a short content hash: two edits within the same filesystem-second
+        // (external-storage timestamps are coarse) must still reset the on-TV choices.
+        long hash = file.length();
+        try (java.io.InputStream in = new java.io.FileInputStream(file)) {
+            byte[] buf = new byte[4096];
+            int n = in.read(buf);
+            for (int i = 0; i < n; i++) hash = hash * 31 + (buf[i] & 0xff);
+        } catch (Exception ignored) {
         }
+        return hash + "@" + file.lastModified();
     }
 
-    private static String fileStamp(File file) {
-        return file != null && file.isFile() ? file.length() + "@" + file.lastModified() : "absent";
-    }
-
-    private static String revisionToken(File file) {
+    /** The theme_revision marker text, or "absent"; package-visible for the JVM tests. */
+    static String revisionToken(File file) {
         if (file == null || !file.isFile() || file.length() > 64) return "absent";
         try (InputStream in = new FileInputStream(file)) {
             byte[] bytes = new byte[(int) file.length()];
@@ -238,17 +276,30 @@ final class Config {
     }
 
     private static String string(JSONObject o, String key, String fallback) {
-        Object v = o.opt(key);
+        return string(o.opt(key), fallback);
+    }
+
+    /** Overlay values are type-checked, not trusted: a wrong type keeps the built-in value.
+     *  Package-visible so the JVM tests exercise the same code the launcher runs. */
+    static String string(Object v, String fallback) {
         return v instanceof String ? ((String) v).trim() : fallback;
     }
 
     private static boolean bool(JSONObject o, String key, boolean fallback) {
-        Object v = o.opt(key);
+        return bool(o.opt(key), fallback);
+    }
+
+    static boolean bool(Object v, boolean fallback) {
         return v instanceof Boolean ? (Boolean) v : fallback;
     }
 
     private static int integer(JSONObject o, String key, int fallback, int min, int max) {
-        Object v = o.opt(key);
+        return integer(o.opt(key), fallback, min, max);
+    }
+
+    /** Same contract as {@link #string(Object, String)} for numbers, plus the range check that
+     *  keeps a theme from asking for 0 columns or a 40-second search timeout. */
+    static int integer(Object v, int fallback, int min, int max) {
         if (!(v instanceof Number)) return fallback;
         int i = ((Number) v).intValue();
         return i < min || i > max ? fallback : i;
