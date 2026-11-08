@@ -74,6 +74,8 @@
     <string name="system_settings">Systemeinstellungen</string>
     <string name="greeting_state">Begrüßung: %1$s</string>
     <string name="weather_state">Wetter: %1$s</string>
+    <string name="section_inputs">Menü „Eingänge“</string>
+    <string name="hdmi_only_state">Nur HDMI: %1$s</string>
     <string name="clear_button_state">Clear-Schaltfläche ausblenden: %1$s</string>
     <string name="search_button_state">Search-Schaltfläche ausblenden: %1$s</string>
     <string name="account_button_state">Google-Konto-Schaltfläche ausblenden: %1$s</string>

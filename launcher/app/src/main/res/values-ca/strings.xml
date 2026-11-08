@@ -73,6 +73,8 @@
     <string name="system_settings">Configuració del sistema</string>
     <string name="greeting_state">Salutació: %1$s</string>
     <string name="weather_state">Temps: %1$s</string>
+    <string name="section_inputs">Menú d\'entrades</string>
+    <string name="hdmi_only_state">Només HDMI: %1$s</string>
     <string name="clear_button_state">Amaga el botó Clear: %1$s</string>
     <string name="search_button_state">Amaga el botó Search: %1$s</string>
     <string name="account_button_state">Amaga el botó del compte de Google: %1$s</string>

@@ -76,6 +76,8 @@
     <string name="system_settings">Sistemska podešavanja</string>
     <string name="greeting_state">Pozdrav: %1$s</string>
     <string name="weather_state">Vreme: %1$s</string>
+    <string name="section_inputs">Meni ulaza</string>
+    <string name="hdmi_only_state">Samo HDMI: %1$s</string>
     <string name="clear_button_state">Sakrij dugme Clear: %1$s</string>
     <string name="search_button_state">Sakrij dugme Search: %1$s</string>
     <string name="account_button_state">Sakrij dugme za Google nalog: %1$s</string>

@@ -74,6 +74,8 @@
     <string name="animations_state">Анимация: %1$s</string>
     <string name="greeting_state">Приветствие: %1$s</string>
     <string name="weather_state">Погода: %1$s</string>
+    <string name="section_inputs">Меню «Вход»</string>
+    <string name="hdmi_only_state">Только HDMI: %1$s</string>
     <string name="weather_offline">Нет подключения — погода недоступна</string>
     <string name="condition_clear">Ясно</string>
     <string name="condition_partly_cloudy">Малооблачно</string>

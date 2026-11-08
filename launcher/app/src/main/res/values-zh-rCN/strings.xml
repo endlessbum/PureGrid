@@ -73,6 +73,8 @@
     <string name="system_settings">系统设置</string>
     <string name="greeting_state">问候语：%1$s</string>
     <string name="weather_state">天气：%1$s</string>
+    <string name="section_inputs">「输入」菜单</string>
+    <string name="hdmi_only_state">仅显示 HDMI：%1$s</string>
     <string name="clear_button_state">隐藏 Clear 按钮：%1$s</string>
     <string name="search_button_state">隐藏 Search 按钮：%1$s</string>
     <string name="account_button_state">隐藏 Google 账号按钮：%1$s</string>

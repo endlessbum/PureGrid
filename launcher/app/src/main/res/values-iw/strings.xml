@@ -92,6 +92,8 @@
     <string name="animations_state">הנפשה: %1$s</string>
     <string name="greeting_state">ברכה: %1$s</string>
     <string name="weather_state">מזג אוויר: %1$s</string>
+    <string name="section_inputs">תפריט «מקורות»</string>
+    <string name="hdmi_only_state">HDMI בלבד: %1$s</string>
     <string name="follow_theme">פעל לפי ערכת העיצוב (איפוס הבחירות שבוצעו בטלוויזיה)</string>
     <string name="follow_theme_hint">משתמש בערכת העיצוב הנוכחית או בהגדרות הפריסה וההנפשה המובנות. דחיפה או איפוס של ערכת עיצוב מנקים גם את הבחירות שבוצעו בטלוויזיה.</string>
     <string name="tv_settings">הגדרות המערכת של הטלוויזיה</string>

@@ -95,6 +95,8 @@
     <string name="system_settings">إعدادات النظام</string>
     <string name="greeting_state">الترحيب: %1$s</string>
     <string name="weather_state">الطقس: %1$s</string>
+    <string name="section_inputs">قائمة «المصادر»</string>
+    <string name="hdmi_only_state">HDMI فقط: %1$s</string>
     <string name="clear_button_state">إخفاء زر Clear: %1$s</string>
     <string name="search_button_state">إخفاء زر Search: %1$s</string>
     <string name="account_button_state">إخفاء زر حساب Google: %1$s</string>

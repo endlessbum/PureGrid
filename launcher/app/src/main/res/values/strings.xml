@@ -56,6 +56,8 @@
     <string name="animations_state">Animation: %1$s</string>
     <string name="greeting_state">Greeting: %1$s</string>
     <string name="weather_state">Weather: %1$s</string>
+    <string name="section_inputs">Inputs menu</string>
+    <string name="hdmi_only_state">Only HDMI: %1$s</string>
     <string name="weather_offline">No connection — weather cannot be refreshed</string>
     <string name="condition_clear">Clear</string>
     <string name="condition_partly_cloudy">Partly cloudy</string>

@@ -27,6 +27,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -176,6 +177,10 @@ public class SearchActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // A launcher sub-screen: MainActivity released KEEP_SCREEN_ON in its onPause, so take the
+        // flag here — otherwise the system screen timeout (10 min on the test TV) naps the TV
+        // while the user parks on search. The flag only counts while this window is visible.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_search);
         density = getResources().getDisplayMetrics().density;
         EditText input = findViewById(R.id.searchInput);

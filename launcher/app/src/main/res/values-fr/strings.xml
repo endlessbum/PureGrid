@@ -95,6 +95,8 @@
     <string name="system_settings">Paramètres système</string>
     <string name="greeting_state">Salutation : %1$s</string>
     <string name="weather_state">Météo : %1$s</string>
+    <string name="section_inputs">Menu « Entrées »</string>
+    <string name="hdmi_only_state">HDMI uniquement : %1$s</string>
     <string name="clear_button_state">Masquer le bouton Clear : %1$s</string>
     <string name="search_button_state">Masquer le bouton Search : %1$s</string>
     <string name="account_button_state">Masquer le bouton Compte Google : %1$s</string>

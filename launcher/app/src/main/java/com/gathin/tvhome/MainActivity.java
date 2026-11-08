@@ -85,6 +85,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -418,16 +419,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         weatherEnabled = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE)
                 .getBoolean("weather_enabled", true);
-        // Freeze the slot to the room the widest clock text needs ("88:88" — a narrower moment
-        // like "9:50" would freeze a short slot and later clip "12:50" to "12:5"), so neither
-        // the clock nor the slide can ever resize the top bar row.
+        // Freeze the slot to the room the widest clock text needs — "88:88" and "00:00" (the
+        // round zero renders wider than the eight), so a narrower moment like "9:50" freezes a
+        // short slot and would later clip "12:50" to "12:5". A couple of spare dp keep even a
+        // wider glyph whole; the divider and the date column right of the slot just shift a
+        // little. Neither the clock nor the slide can resize the top bar row.
         clockSlot.post(() -> {
             if (clockSlot.getWidth() == 0 || clockSlot.getHeight() == 0) return;
             TextView clockView = (TextView) findViewById(R.id.clock);
-            float widest = clockView.getPaint().measureText("88:88");
+            float widest = Math.max(clockView.getPaint().measureText("88:88"),
+                    clockView.getPaint().measureText("00:00"));
             ViewGroup.LayoutParams lp = clockSlot.getLayoutParams();
             lp.width = Math.max(clockFace.getWidth(),
-                    (int) Math.ceil(widest + (clockFace.getWidth() - clockView.getWidth())));
+                    (int) Math.ceil(widest + (clockFace.getWidth() - clockView.getWidth())))
+                    + (int) Math.ceil(2 * density);
             lp.height = clockSlot.getHeight();
             clockSlot.setLayoutParams(lp);
             weatherFace.setVisibility(View.INVISIBLE);
@@ -1559,11 +1564,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             if (position < COLUMNS) return false;          // dock row: let focus move to the top bar
             target = position - COLUMNS;
-            // Up from the first row under the dock: the bar must already be at its resting place,
-            // never glide there. Snap instantly (as Home does) and focus the same column, so the
-            // jump reads as a plain focus move instead of a catch-up scroll.
+            // Up from the first row under the dock is the down-move played backwards: one
+            // continuous glide parks the bar exactly home and only then does the focus land, so
+            // the arrival never ends in a correction (glideHomeAndFocus).
             if (target < COLUMNS) {
-                focusTile(target, true);
+                glideHomeAndFocus(target);
                 return true;
             }
         } else {
@@ -1639,6 +1644,71 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void focusTile(int position) {
         focusTile(position, false);
+    }
+
+    /**
+     * Up from the first row under the dock: the return trip as one continuous motion. Everything
+     * still in flight is stopped first, so the single glide starts from a settled grid and ends
+     * exactly at 0 — the dock's resting place — and the focus (the glow and the hero with it)
+     * lands only once the grid rests there. A residual correction, should the glide ever stop
+     * short, happens before the focus lands, so the arrival is the end of the motion: nothing
+     * visibly dock-cranks into place afterwards, the way down never does either.
+     */
+    private void glideHomeAndFocus(int column) {
+        if (adapter.getItemCount() == 0) {
+            btnWifi.requestFocus();
+            return;
+        }
+        final int pos = Math.max(0, Math.min(column, adapter.getItemCount() - 1));
+        cancelPendingFocus();
+        // A settled start: whatever glide carried the row below into view is stopped here, so the
+        // one glide below cannot race it and stop short of home.
+        grid.stopScroll();
+        int dy = -grid.computeVerticalScrollOffset();
+        if (Math.abs(dy) <= (int) (2 * density)) {
+            focusTile(pos);                       // already home: plain tile-to-tile hand-off
+            return;
+        }
+        parkFocusOnGrid();
+        if (!animations || reducedMotion) {
+            grid.scrollBy(0, dy);
+            grid.post(() -> {
+                RecyclerView.ViewHolder h = grid.findViewHolderForAdapterPosition(pos);
+                if (h != null) h.itemView.findViewById(R.id.card).requestFocus();
+            });
+            return;
+        }
+        grid.smoothScrollBy(0, dy);
+        restFocusRunner = new Runnable() {
+            @Override
+            public void run() {
+                if (restFocusRunner == null) return;   // superseded by another request
+                if (pos >= adapter.getItemCount()) {
+                    restFocusRunner = null;
+                    return;
+                }
+                if (grid.getScrollState() != RecyclerView.SCROLL_STATE_IDLE || grid.isComputingLayout()) {
+                    grid.post(this);
+                    return;
+                }
+                int left = -grid.computeVerticalScrollOffset();
+                if (Math.abs(left) > (int) (2 * density)) {
+                    // glide the remainder before the focus lands, so no correction ever shows
+                    // after the arrival
+                    grid.smoothScrollBy(0, left);
+                    grid.post(this);
+                    return;
+                }
+                RecyclerView.ViewHolder h = grid.findViewHolderForAdapterPosition(pos);
+                if (h == null) {
+                    grid.post(this);
+                    return;
+                }
+                restFocusRunner = null;
+                h.itemView.findViewById(R.id.card).requestFocus();
+            }
+        };
+        grid.post(restFocusRunner);
     }
 
     /**
@@ -2654,6 +2724,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         final PopupWindow popup = glassPopup(panel, width);
 
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
+        // The settings' "Only HDMI" switch: legacy Composite/AV rows and Live TV stay out of the
+        // menu entirely, leaving just the HDMI ports (and a CEC device merged into its port).
+        boolean hdmiOnly = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE)
+                .getBoolean("inputs_hdmi_only", false);
         boolean sawNonHdmi = false;
         String tunerId = null;
         boolean tunerIsHw = false;
@@ -2674,6 +2748,29 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 if (tim.getInputState(info.getId()) == TvInputManager.INPUT_STATE_CONNECTED) hdmiConnected++;
             }
             boolean hdmiStateBogus = hdmiPorts > 1 && hdmiConnected == hdmiPorts;
+            // CEC devices (a console, a player) register their own HDMI input hanging off the port
+            // they are plugged into; merged into that port's row they say what is connected AND
+            // where — standalone they read as yet another port. No parent id (or a parent that is
+            // not one of the listed ports) leaves the device its own row as before; with bogus
+            // per-port states nothing merges, so no device loses its row either.
+            Map<String, String> deviceByPort = new HashMap<>();
+            Map<String, Integer> deviceStateByPort = new HashMap<>();
+            Set<String> mergedDevices = new HashSet<>();
+            if (!hdmiStateBogus) {
+                Set<String> portIds = new HashSet<>();
+                for (TvInputInfo info : inputs) {
+                    if (info.isPassthroughInput() && info.getType() == TvInputInfo.TYPE_HDMI) portIds.add(info.getId());
+                }
+                for (TvInputInfo info : inputs) {
+                    if (!info.isPassthroughInput() || info.getType() != TvInputInfo.TYPE_HDMI) continue;
+                    String parent = info.getParentId();
+                    if (parent == null || !portIds.contains(parent)) continue;
+                    CharSequence l = info.loadLabel(this);
+                    if (l != null && l.length() > 0) deviceByPort.put(parent, l.toString());
+                    deviceStateByPort.put(parent, tim.getInputState(info.getId()));
+                    mergedDevices.add(info.getId());
+                }
+            }
             for (TvInputInfo info : inputs) {
                 if (info.getType() == TvInputInfo.TYPE_TUNER
                         && (info.getServiceInfo().applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0) {
@@ -2685,22 +2782,29 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         tunerIsHw = hw;
                     }
                 }
-                if (!info.isPassthroughInput()) continue;
+                if (!info.isPassthroughInput() || mergedDevices.contains(info.getId())) continue;
                 CharSequence l = info.loadLabel(this);
                 String label = l == null ? info.getId() : l.toString();
                 boolean hdmi = info.getType() == TvInputInfo.TYPE_HDMI;
+                if (hdmiOnly && !hdmi) continue;
                 if (hdmi && !label.toUpperCase(Locale.ROOT).contains("HDMI")) label = "HDMI " + label;
                 final String id = info.getId();
                 int state = hdmi && hdmiStateBogus ? -1 : tim.getInputState(id);
+                // The port often sits in CONNECTED_STANDBY while the device behind it reports
+                // CONNECTED — the device is the one actually plugged in, so its state lights the row.
+                Integer deviceState = deviceStateByPort.get(id);
+                if (deviceState != null && deviceState == TvInputManager.INPUT_STATE_CONNECTED) {
+                    state = TvInputManager.INPUT_STATE_CONNECTED;
+                }
                 if (!hdmi && rows.getChildCount() > 0 && !sawNonHdmi) addSeparator(rows);
                 if (!hdmi) sawNonHdmi = true;
                 addInputRow(rows, popup, hdmi ? R.drawable.ic_input : R.drawable.ic_av, label, state,
-                        () -> openInput(id));
+                        deviceByPort.get(id), () -> openInput(id));
             }
         }
         // Nothing to list where there is no TvInputManager: the TV's own source panel switches inputs.
         if (rows.getChildCount() == 0 && !sourcePanelService.isEmpty()) {
-            addInputRow(rows, popup, R.drawable.ic_input, getString(R.string.inputs), -1, this::openSourcePanel);
+            addInputRow(rows, popup, R.drawable.ic_input, getString(R.string.inputs), -1, null, this::openSourcePanel);
         }
         Intent liveTv = liveTvIntent();
         if (liveTv != null && tunerId != null) {
@@ -2708,10 +2812,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .setDataAndType(TvContract.buildChannelUriForPassthroughInput(tunerId), "vnd.android.cursor.item/channel")
                     .setPackage(liveTvPkg);
         }
-        if (liveTv != null) {
+        if (liveTv != null && !hdmiOnly) {
             if (rows.getChildCount() > 0) addSeparator(rows);
             final Intent liveTvIntent = liveTv;
-            addInputRow(rows, popup, R.drawable.ic_livetv, getString(R.string.live_tv), -1, () -> open(liveTvIntent));
+            addInputRow(rows, popup, R.drawable.ic_livetv, getString(R.string.live_tv), -1, null, () -> open(liveTvIntent));
         }
         if (rows.getChildCount() == 0) {
             Toast.makeText(this, R.string.no_inputs, Toast.LENGTH_SHORT).show();
@@ -2760,16 +2864,23 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         rows.addView(line, lp);
     }
 
-    private void addInputRow(LinearLayout rows, PopupWindow popup, int iconRes, String title, int state, Runnable action) {
+    /** One menu row; deviceLabel, when the TV reports the CEC device behind a connected HDMI port, names it. */
+    private void addInputRow(LinearLayout rows, PopupWindow popup, int iconRes, String title, int state,
+            String deviceLabel, Runnable action) {
         View row = getLayoutInflater().inflate(R.layout.item_input, rows, false);
         ((ImageView) row.findViewById(R.id.icon)).setImageResource(iconRes);
         ((TextView) row.findViewById(R.id.title)).setText(title);
         TextView status = row.findViewById(R.id.status);
         View dot = row.findViewById(R.id.dot);
         // This TV reports "standby" for every port whether or not something is plugged in, so only
-        // definite states are shown.
+        // definite states are shown. A connected port gets just the green dot; when the TV knows
+        // the device behind it (CEC), the name sits where the "Подключено" caption used to.
         if (state == TvInputManager.INPUT_STATE_CONNECTED) {
-            status.setText(R.string.connected);
+            if (deviceLabel != null) {
+                status.setText(deviceLabel);
+            } else {
+                status.setVisibility(View.GONE);
+            }
             dot.setVisibility(View.VISIBLE);
         } else if (state == TvInputManager.INPUT_STATE_DISCONNECTED) {
             status.setText(R.string.not_connected);

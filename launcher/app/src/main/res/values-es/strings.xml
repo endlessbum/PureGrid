@@ -73,6 +73,8 @@
     <string name="system_settings">Ajustes del sistema</string>
     <string name="greeting_state">Saludo: %1$s</string>
     <string name="weather_state">Tiempo: %1$s</string>
+    <string name="section_inputs">Menú de entradas</string>
+    <string name="hdmi_only_state">Solo HDMI: %1$s</string>
     <string name="clear_button_state">Ocultar botón Clear: %1$s</string>
     <string name="search_button_state">Ocultar botón Search: %1$s</string>
     <string name="account_button_state">Ocultar botón de cuenta de Google: %1$s</string>

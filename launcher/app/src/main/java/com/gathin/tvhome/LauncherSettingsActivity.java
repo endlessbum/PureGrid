@@ -14,6 +14,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -46,6 +47,7 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView animationsChoice;
     private TextView greetingChoice;
     private TextView weatherChoice;
+    private TextView hdmiOnlyChoice;
     private TextView followThemeChoice;
     private TextView clearButtonChoice;
     private TextView searchButtonChoice;
@@ -58,6 +60,8 @@ public final class LauncherSettingsActivity extends Activity {
     private boolean animations;
     private boolean greeting;
     private boolean weather;
+    /** Inputs menu shows HDMI ports only: no Composite/AV rows and no Live TV. */
+    private boolean hdmiOnly;
     private boolean clearButtonHidden;
     private boolean searchButtonHidden;
     private boolean accountButtonHidden;
@@ -67,6 +71,10 @@ public final class LauncherSettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        // A launcher sub-screen: MainActivity released KEEP_SCREEN_ON in its onPause, so take the
+        // flag here — otherwise the system screen timeout naps the TV while the user sits in
+        // settings. The flag only counts while this window is visible.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_launcher_settings);
         choices = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
         Config config = Config.load(this);
@@ -74,6 +82,7 @@ public final class LauncherSettingsActivity extends Activity {
         animations = config.animations;
         greeting = choices.getBoolean("greeting_enabled", true);
         weather = choices.getBoolean("weather_enabled", true);
+        hdmiOnly = choices.getBoolean("inputs_hdmi_only", false);
         fixedAccent = choices.getInt(PREF_ACCENT, 0);
         if (accentIndex(fixedAccent) < 0) fixedAccent = 0;
 
@@ -118,6 +127,13 @@ public final class LauncherSettingsActivity extends Activity {
         weatherChoice.setOnClickListener(v -> {
             weather = !weather;
             choices.edit().putBoolean("weather_enabled", weather).apply();
+            setResult(RESULT_OK);
+            refresh();
+        });
+        hdmiOnlyChoice = findViewById(R.id.hdmiOnlyChoice);
+        hdmiOnlyChoice.setOnClickListener(v -> {
+            hdmiOnly = !hdmiOnly;
+            choices.edit().putBoolean("inputs_hdmi_only", hdmiOnly).apply();
             setResult(RESULT_OK);
             refresh();
         });
@@ -214,6 +230,9 @@ public final class LauncherSettingsActivity extends Activity {
         weatherChoice.setText(getString(R.string.weather_state,
                 getString(weather ? R.string.on : R.string.off)));
         weatherChoice.setSelected(weather);
+        hdmiOnlyChoice.setText(getString(R.string.hdmi_only_state,
+                getString(hdmiOnly ? R.string.on : R.string.off)));
+        hdmiOnlyChoice.setSelected(hdmiOnly);
         followThemeChoice.setSelected(!hasOnTvChoices());
         clearButtonChoice.setText(getString(R.string.clear_button_state,
                 getString(clearButtonHidden ? R.string.on : R.string.off)));

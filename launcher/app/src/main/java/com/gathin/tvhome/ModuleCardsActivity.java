@@ -3,6 +3,7 @@ package com.gathin.tvhome;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -25,6 +26,9 @@ public class ModuleCardsActivity extends android.app.Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // A launcher sub-screen: MainActivity released KEEP_SCREEN_ON in its onPause, so take the
+        // flag here — otherwise the system screen timeout naps the TV while this screen is open.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_module_cards);
         recycler = findViewById(R.id.recycler);
         empty = findViewById(R.id.empty);

@@ -92,6 +92,8 @@
     <string name="animations_state">Animação: %1$s</string>
     <string name="greeting_state">Saudação: %1$s</string>
     <string name="weather_state">Tempo: %1$s</string>
+    <string name="section_inputs">Menu «Entradas»</string>
+    <string name="hdmi_only_state">Apenas HDMI: %1$s</string>
     <string name="follow_theme">Seguir o tema (restaura as escolhas feitas na TV)</string>
     <string name="follow_theme_hint">Usa o tema atual ou as configurações de layout e animação integradas. Aplicar ou redefinir um tema também limpa as escolhas feitas na TV.</string>
     <string name="tv_settings">Configurações do sistema da TV</string>

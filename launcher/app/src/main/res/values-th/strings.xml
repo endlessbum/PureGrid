@@ -74,6 +74,8 @@
     <string name="system_settings">ตั้งค่าระบบ</string>
     <string name="greeting_state">คำทักทาย: %1$s</string>
     <string name="weather_state">สภาพอากาศ: %1$s</string>
+    <string name="section_inputs">เมนู «แหล่งสัญญาณ»</string>
+    <string name="hdmi_only_state">HDMI เท่านั้น: %1$s</string>
     <string name="clear_button_state">ซ่อนปุ่ม Clear: %1$s</string>
     <string name="search_button_state">ซ่อนปุ่ม Search: %1$s</string>
     <string name="account_button_state">ซ่อนปุ่มบัญชี Google: %1$s</string>

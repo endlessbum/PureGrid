@@ -95,6 +95,8 @@
     <string name="system_settings">Sistem ayarları</string>
     <string name="greeting_state">Karşılama: %1$s</string>
     <string name="weather_state">Hava durumu: %1$s</string>
+    <string name="section_inputs">Menü «Girişler»</string>
+    <string name="hdmi_only_state">Yalnızca HDMI: %1$s</string>
     <string name="clear_button_state">Clear düğmesini gizle: %1$s</string>
     <string name="search_button_state">Search düğmesini gizle: %1$s</string>
     <string name="account_button_state">Google hesabı düğmesini gizle: %1$s</string>
