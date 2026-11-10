@@ -5,15 +5,12 @@
     <string name="input">مدخل</string>
     <string name="wifi">واي فاي</string>
     <string name="settings">الإعدادات</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">مسح</string>
+    <string name="search">بحث</string>
     <string name="search_section_apps">التطبيقات</string>
     <string name="search_empty">لا نتائج</string>
     <string name="search_no_content_hint">التطبيقات المثبتة لا توفّر محتوى للبحث</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="choose_input">المدخلات</string>
-    <string name="connected">متصل</string>
-    <string name="standby">في وضع الاستعداد</string>
     <string name="not_connected">لا يوجد جهاز</string>
     <string name="live_tv">البث المباشر</string>
     <string name="no_inputs">لم يتم العثور على مدخلات</string>
@@ -47,7 +44,7 @@
     <string name="no_module_cards">لا توجد بطاقات وحدات مثبّتة</string>
     <string name="card_app_name">التطبيق: %1$s</string>
     <string name="card_state_shown">معروضة</string>
-    <string name="card_state_over_limit">معروضة، فوق الحد الأقصى وهو 8</string>
+    <string name="card_state_over_limit">مفعّلة، فوق الحد الأقصى وهو 8 (غير معروضة)</string>
     <string name="card_state_hidden">مخفية</string>
     <string name="card_state_new">جديدة</string>
     <string name="card_state_new_key">مفتاح جديد</string>
@@ -84,7 +81,6 @@
     <string name="cleaned">اكتمل التنظيف</string>
     <string name="cleaning_started">بدأ التنظيف</string>
     <string name="cleaning_unavailable">في أندرويد 14 والإصدارات الأحدث لا يسمح النظام للمشغّل بإنهاء عمليات التطبيقات الأخرى في الخلفية</string>
-    <string name="cleared_apps">تم إغلاق %1$d من التطبيقات</string>
     <string name="dock_editor_settings">إعدادات الشريط</string>
     <string name="dock_editor_hide_below">إخفاء التطبيقات أسفل الشريط</string>
     <string name="dock_editor_apply">تطبيق</string>
@@ -97,8 +93,8 @@
     <string name="weather_state">الطقس: %1$s</string>
     <string name="section_inputs">قائمة «المصادر»</string>
     <string name="hdmi_only_state">HDMI فقط: %1$s</string>
-    <string name="clear_button_state">إخفاء زر Clear: %1$s</string>
-    <string name="search_button_state">إخفاء زر Search: %1$s</string>
+    <string name="clear_button_state">إخفاء زر مسح: %1$s</string>
+    <string name="search_button_state">إخفاء زر بحث: %1$s</string>
     <string name="account_button_state">إخفاء زر حساب Google: %1$s</string>
     <string name="done">تم</string>
     <string name="settings_subtitle">اللون المميز والتخطيط والحركة</string>

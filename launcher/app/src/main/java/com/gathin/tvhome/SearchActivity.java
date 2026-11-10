@@ -500,6 +500,9 @@ public class SearchActivity extends Activity {
      *  dropped, and a stored answer only shows under the generation it was given for. */
     private void publishAnswer(ContentSearch.Provider p, int gen, List<ContentSearch.Result> res) {
         if (gen != generation) return;   // a newer keystroke has superseded this answer
+        // A queued answer can land after onDestroy; an adapter update on a torn-down window is
+        // harmless but pointless, so drop it the way MainActivity guards its publish paths.
+        if (isDestroyed()) return;
         content.put(p.authority, res);
         contentGen.put(p.authority, gen);
         rebuildRows();

@@ -15,8 +15,6 @@
     <!-- Shown when no installed app exports a search provider: content rows cannot exist at all. -->
     <string name="search_no_content_hint">Installed apps offer no content to search</string>
     <string name="choose_input">Inputs</string>
-    <string name="connected">Connected</string>
-    <string name="standby">Standby</string>
     <string name="not_connected">No device</string>
     <string name="live_tv">Live TV</string>
     <string name="no_inputs">No inputs found</string>
@@ -30,11 +28,9 @@
     <string name="connected_no_access">Connected without access</string>
     <!-- A VPN is up, but its traffic is blocked or not reaching the internet. -->
     <string name="vpn_traffic_blocked">VPN traffic blocked</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="cleaned">Cleaning done</string>
     <string name="cleaning_started">Cleaning started</string>
     <string name="cleaning_unavailable">On Android 14 and newer the system does not let a launcher end background processes of other apps</string>
-    <string name="cleared_apps">Closed %1$d apps</string>
     <string name="not_available">Not available on this TV</string>
     <string name="cant_open">Can\'t open %1$s</string>
     <string name="date_format">d MMMM</string>
@@ -123,7 +119,7 @@
     <string name="no_module_cards">No module cards installed</string>
     <string name="card_app_name">App: %1$s</string>
     <string name="card_state_shown">Shown</string>
-    <string name="card_state_over_limit">Shown, over the limit of 8</string>
+    <string name="card_state_over_limit">On, over the limit of 8 (not shown)</string>
     <string name="card_state_hidden">Hidden</string>
     <string name="card_state_new">New</string>
     <string name="card_state_new_key">New key</string>

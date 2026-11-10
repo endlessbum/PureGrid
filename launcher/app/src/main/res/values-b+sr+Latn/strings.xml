@@ -5,15 +5,12 @@
     <string name="input">Ulaz</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">Podešavanja</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">Očisti</string>
+    <string name="search">Pretraga</string>
     <string name="search_section_apps">Aplikacije</string>
     <string name="search_empty">Ništa nije pronađeno</string>
     <string name="search_no_content_hint">Instalirane aplikacije ne nude sadržaj za pretragu</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="choose_input">Ulazi</string>
-    <string name="connected">Povezano</string>
-    <string name="standby">Mirovanje</string>
     <string name="not_connected">Nema uređaja</string>
     <string name="live_tv">TV programi</string>
     <string name="no_inputs">Nema pronađenih ulaza</string>
@@ -65,7 +62,6 @@
     <string name="cleaned">Čišćenje završeno</string>
     <string name="cleaning_started">Čišćenje je pokrenuto</string>
     <string name="cleaning_unavailable">Na Androidu 14 i novijim verzijama sistem ne dozvoljava pokretaču da zaustavi pozadinske procese drugih aplikacija</string>
-    <string name="cleared_apps">Zatvoreno aplikacija: %1$d</string>
     <string name="dock_editor_settings">Podešavanja doka</string>
     <string name="dock_editor_hide_below">Sakrij aplikacije ispod doka</string>
     <string name="dock_editor_apply">Primeni</string>
@@ -78,8 +74,8 @@
     <string name="weather_state">Vreme: %1$s</string>
     <string name="section_inputs">Meni ulaza</string>
     <string name="hdmi_only_state">Samo HDMI: %1$s</string>
-    <string name="clear_button_state">Sakrij dugme Clear: %1$s</string>
-    <string name="search_button_state">Sakrij dugme Search: %1$s</string>
+    <string name="clear_button_state">Sakrij dugme Očisti: %1$s</string>
+    <string name="search_button_state">Sakrij dugme Pretraga: %1$s</string>
     <string name="account_button_state">Sakrij dugme za Google nalog: %1$s</string>
     <string name="done">Gotovo</string>
     <string name="settings_subtitle">Akcent, raspored i animacije</string>
@@ -117,7 +113,7 @@
     <string name="no_module_cards">Nema instaliranih modulskih kartica</string>
     <string name="card_app_name">Aplikacija: %1$s</string>
     <string name="card_state_shown">Prikazano</string>
-    <string name="card_state_over_limit">Prikazano, preko limita od 8</string>
+    <string name="card_state_over_limit">Uključeno, preko limita od 8 (nije prikazano)</string>
     <string name="card_state_hidden">Skriveno</string>
     <string name="card_state_new">Novo</string>
     <string name="card_state_new_key">Novi ključ</string>

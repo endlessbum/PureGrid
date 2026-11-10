@@ -5,15 +5,12 @@
     <string name="input">Entrada</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">Ajustes</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">Limpiar</string>
+    <string name="search">Buscar</string>
     <string name="search_section_apps">Aplicaciones</string>
     <string name="search_empty">No se encontró nada</string>
     <string name="search_no_content_hint">Las aplicaciones instaladas no ofrecen contenido para buscar</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="choose_input">Entradas</string>
-    <string name="connected">Conectado</string>
-    <string name="standby">En espera</string>
     <string name="not_connected">Sin dispositivo</string>
     <string name="live_tv">TV en vivo</string>
     <string name="no_inputs">No se encontraron entradas</string>
@@ -59,7 +56,6 @@
     <string name="cleaned">Limpieza completada</string>
     <string name="cleaning_started">Limpieza iniciada</string>
     <string name="cleaning_unavailable">En Android 14 y versiones posteriores, el sistema no permite que un lanzador cierre procesos en segundo plano de otras aplicaciones</string>
-    <string name="cleared_apps">%1$d aplicaciones cerradas</string>
     <string name="vpn">VPN</string>
     <string name="home_settings">Elegir inicio predeterminado</string>
     <string name="home_settings_help">Seleccione su pantalla de inicio original para dejar de usar PureGrid como inicio, o PureGrid para volver. El lanzador original debe estar activado y su TV debe ofrecer un selector de inicio; use primero el script de restauración si estaba desactivado.</string>
@@ -75,8 +71,8 @@
     <string name="weather_state">Tiempo: %1$s</string>
     <string name="section_inputs">Menú de entradas</string>
     <string name="hdmi_only_state">Solo HDMI: %1$s</string>
-    <string name="clear_button_state">Ocultar botón Clear: %1$s</string>
-    <string name="search_button_state">Ocultar botón Search: %1$s</string>
+    <string name="clear_button_state">Ocultar botón Limpiar: %1$s</string>
+    <string name="search_button_state">Ocultar botón Buscar: %1$s</string>
     <string name="account_button_state">Ocultar botón de cuenta de Google: %1$s</string>
     <string name="done">Hecho</string>
     <string name="settings_subtitle">Acento, diseño y efectos</string>
@@ -117,7 +113,7 @@
     <string name="no_module_cards">No hay tarjetas de módulos instaladas</string>
     <string name="card_app_name">Aplicación: %1$s</string>
     <string name="card_state_shown">Mostrada</string>
-    <string name="card_state_over_limit">Mostrada, por encima del límite de 8</string>
+    <string name="card_state_over_limit">Activada, por encima del límite de 8 (no visible)</string>
     <string name="card_state_hidden">Oculta</string>
     <string name="card_state_new">Nueva</string>
     <string name="card_state_new_key">Nueva clave</string>

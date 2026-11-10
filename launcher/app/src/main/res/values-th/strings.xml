@@ -5,15 +5,12 @@
     <string name="input">อินพุต</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">ตั้งค่า</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">ล้าง</string>
+    <string name="search">ค้นหา</string>
     <string name="search_section_apps">แอป</string>
     <string name="search_empty">ไม่พบผลลัพธ์</string>
     <string name="search_no_content_hint">แอปที่ติดตั้งไม่มีเนื้อหาสำหรับค้นหา</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="choose_input">แหล่งสัญญาณ</string>
-    <string name="connected">เชื่อมต่อแล้ว</string>
-    <string name="standby">สแตนด์บาย</string>
     <string name="not_connected">ไม่มีอุปกรณ์</string>
     <string name="live_tv">ทีวีสด</string>
     <string name="no_inputs">ไม่พบแหล่งสัญญาณ</string>
@@ -60,7 +57,6 @@
     <string name="cleaned">ล้างเสร็จแล้ว</string>
     <string name="cleaning_started">เริ่มการล้างแล้ว</string>
     <string name="cleaning_unavailable">ใน Android 14 ขึ้นไป ระบบไม่อนุญาตให้หน้าหลักจบกระบวนการพื้นหลังของแอปอื่น</string>
-    <string name="cleared_apps">ปิดแล้ว %1$d แอป</string>
     <string name="vpn">VPN</string>
     <string name="home_settings">เลือกหน้าหลักเริ่มต้น</string>
     <string name="home_settings_help">เลือกหน้าหลักเดิมเพื่อหยุดใช้ PureGrid เป็นหน้าหลัก หรือเลือก PureGrid เพื่อเปลี่ยนกลับ หน้าหลักเดิมต้องเปิดใช้อยู่และทีวีต้องมีหน้าเลือกหน้าหลัก หากถูกปิดใช้งาน ให้ใช้สคริปต์กู้คืนก่อน</string>
@@ -76,8 +72,8 @@
     <string name="weather_state">สภาพอากาศ: %1$s</string>
     <string name="section_inputs">เมนู «แหล่งสัญญาณ»</string>
     <string name="hdmi_only_state">HDMI เท่านั้น: %1$s</string>
-    <string name="clear_button_state">ซ่อนปุ่ม Clear: %1$s</string>
-    <string name="search_button_state">ซ่อนปุ่ม Search: %1$s</string>
+    <string name="clear_button_state">ซ่อนปุ่ม ล้าง: %1$s</string>
+    <string name="search_button_state">ซ่อนปุ่ม ค้นหา: %1$s</string>
     <string name="account_button_state">ซ่อนปุ่มบัญชี Google: %1$s</string>
     <string name="done">เสร็จแล้ว</string>
     <string name="settings_subtitle">สีเน้น เลย์เอาต์ และภาพเคลื่อนไหว</string>
@@ -118,7 +114,7 @@
     <string name="no_module_cards">ไม่ได้ติดตั้งการ์ดโมดูล</string>
     <string name="card_app_name">แอป: %1$s</string>
     <string name="card_state_shown">แสดงอยู่</string>
-    <string name="card_state_over_limit">แสดงอยู่ เกินขีดจำกัดที่ 8</string>
+    <string name="card_state_over_limit">เปิดอยู่ เกินขีดจำกัดที่ 8 (ไม่แสดง)</string>
     <string name="card_state_hidden">ซ่อนอยู่</string>
     <string name="card_state_new">ใหม่</string>
     <string name="card_state_new_key">คีย์ใหม่</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Hebrew screensaver: right-aligned clock/date, RTL date text, LTR time numerals. -->
+<!-- Hebrew screensaver: right-aligned clock/date, RTL date text, LTR time numerals. No ids on the TextClocks: ClockDream only looks up dreamContent/dreamAmbient, and the base layout has none either (keep this file in step with layout/dream_clock.xml). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -26,7 +26,6 @@
             android:baselineAligned="true">
 
             <TextClock
-                android:id="@+id/dreamAmPm"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="10dp"
@@ -40,7 +39,6 @@
                 android:textAllCaps="true" />
 
             <TextClock
-                android:id="@+id/dreamClock"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:format12Hour="h:mm"
@@ -54,7 +52,6 @@
         </LinearLayout>
 
         <TextClock
-            android:id="@+id/dreamDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"

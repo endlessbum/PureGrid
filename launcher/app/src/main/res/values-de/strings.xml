@@ -5,15 +5,12 @@
     <string name="input">Eingang</string>
     <string name="wifi">WLAN</string>
     <string name="settings">Einstellungen</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">Bereinigen</string>
+    <string name="search">Suchen</string>
     <string name="search_section_apps">Apps</string>
     <string name="search_empty">Nichts gefunden</string>
     <string name="search_no_content_hint">Installierte Apps liefern keine Inhalte für die Suche</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="choose_input">Quellen</string>
-    <string name="connected">Verbunden</string>
-    <string name="standby">Standby</string>
     <string name="not_connected">Kein Gerät</string>
     <string name="live_tv">Live TV</string>
     <string name="no_inputs">Keine Quellen gefunden</string>
@@ -60,7 +57,6 @@
     <string name="cleaned">Bereinigung abgeschlossen</string>
     <string name="cleaning_started">Bereinigung gestartet</string>
     <string name="cleaning_unavailable">Ab Android 14 erlaubt das System einem Launcher nicht, Hintergrundprozesse anderer Apps zu beenden</string>
-    <string name="cleared_apps">%1$d Apps beendet</string>
     <string name="vpn">VPN</string>
     <string name="home_settings">Standard-Home auswählen</string>
     <string name="home_settings_help">Wählen Sie Ihren ursprünglichen Home-Bildschirm, um PureGrid nicht mehr als Home zu nutzen, oder PureGrid, um zurückzuwechseln. Der ursprüngliche Launcher muss aktiviert sein, und Ihr TV muss eine Home-Auswahl anbieten; verwenden Sie zuerst das Wiederherstellungsskript, falls er deaktiviert wurde.</string>
@@ -76,8 +72,8 @@
     <string name="weather_state">Wetter: %1$s</string>
     <string name="section_inputs">Menü „Eingänge“</string>
     <string name="hdmi_only_state">Nur HDMI: %1$s</string>
-    <string name="clear_button_state">Clear-Schaltfläche ausblenden: %1$s</string>
-    <string name="search_button_state">Search-Schaltfläche ausblenden: %1$s</string>
+    <string name="clear_button_state">Bereinigen-Schaltfläche ausblenden: %1$s</string>
+    <string name="search_button_state">Suchen-Schaltfläche ausblenden: %1$s</string>
     <string name="account_button_state">Google-Konto-Schaltfläche ausblenden: %1$s</string>
     <string name="done">Fertig</string>
     <string name="settings_subtitle">Akzent, Layout und Bewegung</string>
@@ -117,7 +113,7 @@
     <string name="no_module_cards">Keine Modul-Karten installiert</string>
     <string name="card_app_name">App: %1$s</string>
     <string name="card_state_shown">Angezeigt</string>
-    <string name="card_state_over_limit">Angezeigt, über dem Limit von 8</string>
+    <string name="card_state_over_limit">Eingeschaltet, über dem Limit von 8 (nicht angezeigt)</string>
     <string name="card_state_hidden">Ausgeblendet</string>
     <string name="card_state_new">Neu</string>
     <string name="card_state_new_key">Neuer Schlüssel</string>

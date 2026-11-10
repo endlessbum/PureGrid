@@ -5,15 +5,12 @@
     <string name="input">Wejście</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">Ustawienia</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">Czyszczenie</string>
+    <string name="search">Szukaj</string>
     <string name="search_section_apps">Aplikacje</string>
     <string name="search_empty">Nic nie znaleziono</string>
     <string name="search_no_content_hint">Zainstalowane aplikacje nie udostępniają treści do wyszukiwania</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="choose_input">Wejścia</string>
-    <string name="connected">Podłączone</string>
-    <string name="standby">Czuwanie</string>
     <string name="not_connected">Brak urządzenia</string>
     <string name="live_tv">Telewizja</string>
     <string name="no_inputs">Nie znaleziono wejść</string>
@@ -47,7 +44,7 @@
     <string name="no_module_cards">Brak zainstalowanych kart modułów</string>
     <string name="card_app_name">Aplikacja: %1$s</string>
     <string name="card_state_shown">Widoczna</string>
-    <string name="card_state_over_limit">Widoczna, ponad limit 8</string>
+    <string name="card_state_over_limit">Włączona, ponad limit 8 (niewidoczna)</string>
     <string name="card_state_hidden">Ukryta</string>
     <string name="card_state_new">Nowa</string>
     <string name="card_state_new_key">Nowy klucz</string>
@@ -84,7 +81,6 @@
     <string name="cleaned">Czyszczenie zakończone</string>
     <string name="cleaning_started">Czyszczenie rozpoczęte</string>
     <string name="cleaning_unavailable">W Androidzie 14 i nowszych system nie pozwala launcherowi kończyć procesów w tle innych aplikacji</string>
-    <string name="cleared_apps">Zamknięto aplikacji: %1$d</string>
     <string name="dock_editor_settings">Ustawienia doku</string>
     <string name="dock_editor_hide_below">Ukryj aplikacje pod dokiem</string>
     <string name="dock_editor_apply">Zastosuj</string>
@@ -97,8 +93,8 @@
     <string name="weather_state">Pogoda: %1$s</string>
     <string name="section_inputs">Menu „Wejścia”</string>
     <string name="hdmi_only_state">Tylko HDMI: %1$s</string>
-    <string name="clear_button_state">Ukryj przycisk Clear: %1$s</string>
-    <string name="search_button_state">Ukryj przycisk Search: %1$s</string>
+    <string name="clear_button_state">Ukryj przycisk Czyszczenie: %1$s</string>
+    <string name="search_button_state">Ukryj przycisk Szukaj: %1$s</string>
     <string name="account_button_state">Ukryj przycisk konta Google: %1$s</string>
     <string name="done">Gotowe</string>
     <string name="settings_subtitle">Akcent, układ i animacje</string>

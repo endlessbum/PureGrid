@@ -64,6 +64,9 @@ public class ClockDream extends DreamService {
             placeClock();
             content.animate().alpha(1f).setDuration(1200).start();
         });
+        // A second onDreamingStarted without an intervening stop (dream re-selected, vendor quirks)
+        // must not run two tick chains and cross-fade twice per minute forever.
+        handler.removeCallbacks(tick);
         handler.postDelayed(tick, MOVE_MS);
     }
 

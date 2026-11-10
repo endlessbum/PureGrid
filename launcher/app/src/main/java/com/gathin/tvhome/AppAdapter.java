@@ -186,7 +186,7 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         this.favourites = new ArrayList<>(cfg.dockApps);
         this.hidden = new HashSet<>(cfg.hiddenApps);
         this.animations = cfg.animations;
-        this.advancedEffects = cfg.animations && cfg.advancedEffects;
+        this.advancedEffects = cfg.heroEffects;
         this.showHomeSettings = cfg.showHomeSettingsShortcut;
         this.reducedMotion = cfg.reducedMotion;
         // Tiles keep their identity across reload(), so a focused tile stays on its app instead of
@@ -293,18 +293,33 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
             if (ca != cb) return ca ? -1 : 1;
             return a.label.compareToIgnoreCase(b.label);
         });
-        // In the dock editor, pad a short dock with "add" slots so the owner can fill it.
-        if (editingNow && favs.size() < dockSize) {
-            Drawable plus = ctx.getDrawable(R.drawable.ic_plus);
-            // Never beyond the list end: a dock package can be missing from the resolved apps.
-            int at = Math.min(favs.size(), fresh.size());
-            for (int i = favs.size(); i < dockSize; i++) {
-                // A synthetic component keeps RecyclerView's stable ids happy (getItemId needs one);
-                // the name must be unique for the adapter's lifetime, so a monotonic counter, not a
-                // slot index: two "slot2" entries crash RecyclerView's stable-id pass.
-                fresh.add(at++, new Entry(Entry.ADD, "+",
-                        new ComponentName(ADD_PKG, "slot" + addSlotSeq++), null, plus, null, 0));
+        // In the dock editor the first dockSize positions must be exactly the dock row: the
+        // resolved dock tiles in favourites order, then one "+" slot per empty cell — a package
+        // that is no longer installed, or a short dock. The editor keys slot index to position
+        // (focusEditSlot/deleteEditSlot/moveDockApp all assume position i <-> favourites[i]), so
+        // letting a card or a grid app sort into the band would make those operate on the wrong tile.
+        if (editingNow) {
+            List<Entry> body = new ArrayList<>(fresh);
+            fresh.clear();
+            Drawable plus = null;
+            for (String fav : favs) {
+                Entry match = null;
+                for (Entry e : body) {
+                    if ((e.kind == Entry.APP || e.kind == Entry.CARD) && e.pkg.equals(fav)) { match = e; break; }
+                }
+                if (match != null) {
+                    fresh.add(match);
+                    body.remove(match);
+                } else {
+                    if (plus == null) plus = ctx.getDrawable(R.drawable.ic_plus);
+                    fresh.add(addSlot(plus));
+                }
             }
+            for (int i = favs.size(); i < dockSize; i++) {
+                if (plus == null) plus = ctx.getDrawable(R.drawable.ic_plus);
+                fresh.add(addSlot(plus));
+            }
+            fresh.addAll(body);
         }
         // Retain the optional Default-home tile until dependent tile-ordering work is merged.
         if (showHomeSettings
@@ -320,6 +335,14 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
     public void setFavourites(List<String> favs) {
         this.favourites = new ArrayList<>(favs);
         reload(new ArrayList<>());
+    }
+
+    /** The same rebuild keeping the shown module cards on the grid and running {@code onReady} on
+     *  the UI thread once the fresh tiles are published — so a caller can focus a slot without
+     *  guessing how many frames the off-thread rebuild will take. */
+    public void setFavourites(List<String> favs, List<Cards.Card> cards, Runnable onReady) {
+        this.favourites = new ArrayList<>(favs);
+        reloadAsync(cards, onReady);
     }
 
     public List<String> getFavourites() { return new ArrayList<>(favourites); }
@@ -363,6 +386,14 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         return -1;
     }
 
+    /** A fresh "+" slot for the dock editor. A synthetic component keeps RecyclerView's stable ids
+     *  happy (getItemId needs one); the name must be unique for the adapter's lifetime, so a
+     *  monotonic counter, not a slot index: two "slot2" entries crash RecyclerView's stable-id pass. */
+    private Entry addSlot(Drawable plus) {
+        return new Entry(Entry.ADD, "+",
+                new ComponentName(ADD_PKG, "slot" + addSlotSeq++), null, plus, null, 0);
+    }
+
     /**
      * Editor-only: remove the dock app at {@code index} and leave a matching "+" slot, updating just
      * the affected tiles (no full rebuild, so the editor does not flicker or lose focus).
@@ -384,11 +415,10 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
         if (adds < want) {
             Drawable plus = ctx.getDrawable(R.drawable.ic_plus);
             int at = Math.min(favourites.size(), items.size());
+            // Monotonic name: a positional one would collide with a surviving "+" slot of the
+            // same index, and duplicated stable ids crash RecyclerView (see addSlot()).
             for (int k = adds; k < want; k++) {
-                // Monotonic name: a positional one would collide with a surviving "+" slot of the
-                // same index, and duplicated stable ids crash RecyclerView (see reload()).
-                items.add(at, new Entry(Entry.ADD, "+",
-                        new ComponentName(ADD_PKG, "slot" + addSlotSeq++), null, plus, null, 0));
+                items.add(at, addSlot(plus));
                 notifyItemInserted(at);
                 at++;
             }
@@ -398,6 +428,13 @@ public class AppAdapter extends RecyclerView.Adapter<AppAdapter.Holder> {
     public void setHideBelow(boolean v) {
         this.hideBelow = v;
         reload(new ArrayList<>());
+    }
+
+    /** The same rebuild keeping the shown module cards on the grid — for the normal-mode eye
+     *  toggle, where no follow-up reloadTiles() republishes them. */
+    public void setHideBelow(boolean v, List<Cards.Card> cards) {
+        this.hideBelow = v;
+        reload(cards);
     }
 
     private Drawable loadBanner(PackageManager pm, ResolveInfo ri) {

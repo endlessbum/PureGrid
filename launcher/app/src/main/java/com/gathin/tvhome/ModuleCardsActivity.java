@@ -13,6 +13,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * The module cards list (docs/specs/card.md §7): every declared card with its state, its app and
@@ -22,6 +25,9 @@ import java.util.Set;
 public class ModuleCardsActivity extends android.app.Activity {
     private RecyclerView recycler;
     private TextView empty;
+    /** One worker owned by the activity: discovery and store writes are serialized, and the
+     *  activity is not pinned by a bare Thread that outlives the screen. */
+    private final ExecutorService bg = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -36,10 +42,25 @@ public class ModuleCardsActivity extends android.app.Activity {
         reload();
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        bg.shutdown();
+    }
+
+    /** Runs work on the background worker, silently skipping it once the activity is torn down. */
+    void bg(Runnable r) {
+        try {
+            bg.execute(r);
+        } catch (RejectedExecutionException dead) {
+            // shutdown() already ran; there is no list left to publish to.
+        }
+    }
+
     /** Discovers the cards on a background thread (PackageManager + signing digests are not
      *  UI-thread work) and rebuilds the list; runs again after every decision. */
     private void reload() {
-        new Thread(() -> {
+        bg(() -> {
             Set<String> hiddenApps = new HashSet<>(Config.load(this).hiddenApps);
             List<Cards.Card> cards = CardFeature.run(
                     () -> Cards.discover(this, hiddenApps, Cards.load(Cards.storeFile(this))),
@@ -49,6 +70,7 @@ public class ModuleCardsActivity extends android.app.Activity {
             Set<String> onScreen = new HashSet<>();
             for (Cards.Card c : Cards.shown(cards)) onScreen.add(c.pkg);
             runOnUiThread(() -> {
+                if (isDestroyed()) return;
                 if (cards.isEmpty()) {
                     recycler.setVisibility(View.GONE);
                     empty.setVisibility(View.VISIBLE);
@@ -58,7 +80,7 @@ public class ModuleCardsActivity extends android.app.Activity {
                 empty.setVisibility(View.GONE);
                 recycler.setAdapter(new CardAdapter(this, cards, onScreen));
             });
-        }).start();
+        });
     }
 
     void onCardChanged() {
@@ -117,10 +139,13 @@ class CardAdapter extends RecyclerView.Adapter<CardAdapter.VH> {
         // write is file I/O, so it (and the refresh that reads it back) stays off the UI thread.
         holder.itemView.setOnClickListener(v -> {
             boolean show = c.state == Cards.State.HIDDEN;
-            new Thread(() -> {
+            owner.bg(() -> {
                 if (!Cards.decide(store, c, show)) return;
-                owner.runOnUiThread(owner::onCardChanged);
-            }).start();
+                owner.runOnUiThread(() -> {
+                    if (owner.isDestroyed()) return;
+                    owner.onCardChanged();
+                });
+            });
         });
     }
 

@@ -269,6 +269,8 @@
                     android:contentDescription="@string/clear"
                     android:nextFocusDown="@+id/grid" />
 
+                <!-- Intentionally narrower than the base 280dp: Hebrew network names run long and
+                     would crowd the buttons to the left of the pill. -->
                 <TextView
                     android:id="@+id/btnWifi"
                     style="@style/TopButton"

@@ -17,16 +17,21 @@ import static org.junit.Assert.fail;
 public class CardFeatureTest {
 
     private final List<Throwable> reported = new ArrayList<>();
+    private CardFeature.Reporter defaultReporter;
 
     @Before
     public void setUp() {
         CardFeature.reset();
+        defaultReporter = CardFeature.reporter;
         CardFeature.reporter = reported::add;
     }
 
     @After
     public void tearDown() {
         CardFeature.reset();
+        // Restore the original reporter: setUp replaced it with the test collector, and a later
+        // test class in the same JVM run must not inherit it (reset() does not touch reporter).
+        CardFeature.reporter = defaultReporter;
     }
 
     @Test

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The two colours more than one surface shares; everything else keeps its inline hex.
+     pill_ink_focused: the ink on the focused white glass, mirrored by res/color/pill_text.xml
+     and res/color/settings_row_text.xml (and by MainActivity's focused-icon tint).
+     warn_amber: connected-without-access tint of the network pill icon and VpnBadge's blocked
+     capsule (VpnBadge.AMBER). -->
+<resources>
+    <color name="pill_ink_focused">#FF101419</color>
+    <color name="warn_amber">#FFFF9F0A</color>
+</resources>

@@ -16,15 +16,24 @@ import java.nio.charset.StandardCharsets;
 /**
  * The clock's weather slide. The reading comes from Yandex Weather when an API key has been
  * pushed ({@code settings put secure yandex_weather_key <key>}, free key from yandex.ru/dev/weather)
- * and, keyless by default, from Open-Meteo (open-meteo.com) — free, no key, no registration, the
- * same national forecast models the big apps blend. Until the network or the location can be had,
- * {@link #fetch} returns null and the clock simply never gives way. Setting
- * {@code settings put secure yandex_weather_test 1} plays a fixed reading for checking the slide.
+ * and, keyless by default, from MET Norway (api.met.no) — free, no key, no registration, their
+ * own forecast models; the terms only ask for an identifiable User-Agent, without which the
+ * endpoint answers 403. With MET Norway unreachable, wttr.in and Open-Meteo (open-meteo.com)
+ * follow — all three serve the blend of national models the big apps show, and all three were
+ * checked against the networks they actually reach (from some Russian ISPs Open-Meteo's host is
+ * filtered outright and wttr.in trickles, while MET Norway answers in a fraction of a second).
+ * Until the network or the location can be had, {@link #fetch} returns null and the clock simply
+ * never gives way. Setting {@code settings put secure yandex_weather_test 1} plays a fixed
+ * reading for checking the slide.
  */
 final class Weather {
 
     private Weather() {
     }
+
+    /** MET Norway refuses unidentified clients with a 403: every request names the launcher. */
+    private static final String USER_AGENT =
+            "PureGrid-TV/2.4 (Android TV home launcher; https://github.com/endlessbum/PureGrid)";
 
     /** One reading: the temperature in degrees Celsius and the condition's string resource (0 = none). */
     static final class Reading {
@@ -58,6 +67,10 @@ final class Weather {
             return null;
         }
         Reading r = yandex(ctx);
+        if (r != null) return r;
+        r = metNo(ctx);
+        if (r != null) return r;
+        r = wttr(ctx);
         return r != null ? r : openMeteo(ctx);
     }
 
@@ -94,7 +107,7 @@ final class Weather {
             String query = "{weatherByPoint(request:{lat:" + ll[0] + ",lon:" + ll[1]
                     + "}){now{temperature condition}}}";
             String body = new JSONObject().put("query", query).toString();
-            String resp = http("https://api.weather.yandex.ru/graphql/query", body, key.trim());
+            String resp = http(ctx, "https://api.weather.yandex.ru/graphql/query", body, key.trim(), null);
             if (resp == null) return null;
             JSONObject now = new JSONObject(resp)
                     .getJSONObject("data").getJSONObject("weatherByPoint").getJSONObject("now");
@@ -108,8 +121,81 @@ final class Weather {
     }
 
     /**
-     * Open-Meteo, the keyless default: a blend of the national weather models (the same data the
-     * consumer apps show), free for any use, no key and no registration to keep alive.
+     * MET Norway (api.met.no), the primary keyless source: free, no key, no registration, their
+     * own forecast models. The endpoint refuses unidentified clients (403 for the stock Dalvik
+     * User-Agent too), so the request carries the launcher's own. The word comes from the coming
+     * hour's symbol when there is one, so the slide shows what is about to be on the street.
+     */
+    private static Reading metNo(Context ctx) {
+        try {
+            double[] ll = locate(ctx);
+            if (ll == null) {
+                dbg(ctx, "weather: no location");
+                return null;
+            }
+            String url = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat="
+                    + String.format(java.util.Locale.US, "%.4f", ll[0])
+                    + "&lon=" + String.format(java.util.Locale.US, "%.4f", ll[1]);
+            String resp = http(ctx, url, null, null, USER_AGENT);
+            if (resp == null) {
+                dbg(ctx, "weather: met.no unreachable");
+                return null;
+            }
+            JSONObject first = new JSONObject(resp).getJSONObject("properties")
+                    .getJSONArray("timeseries").getJSONObject(0);
+            JSONObject data = first.getJSONObject("data");
+            double t = data.getJSONObject("instant").getJSONObject("details")
+                    .optDouble("air_temperature", Double.NaN);
+            if (Double.isNaN(t)) return null;
+            String symbol = "";
+            JSONObject ahead = data.optJSONObject("next_1_hours");
+            if (ahead == null) ahead = data.optJSONObject("next_6_hours");
+            if (ahead != null && ahead.optJSONObject("summary") != null) {
+                symbol = ahead.getJSONObject("summary").optString("symbol_code");
+            }
+            dbg(ctx, "weather from met.no: " + Math.round(t) + "deg symbol=" + symbol);
+            return new Reading((int) Math.round(t), conditionResMetNo(symbol));
+        } catch (Exception e) {
+            dbg(ctx, "weather: met.no failed " + e);
+            return null;
+        }
+    }
+
+    /**
+     * wttr.in, the first keyless fallback: free, no key, no registration, the WWO model blend.
+     * Coordinates go into the URL rounded to two decimals — enough for weather, and it lets the
+     * service's own per-location cache answer. It can take a while to answer (tens of seconds
+     * from some networks), which is fine here: the fetch always runs off the UI thread.
+     */
+    private static Reading wttr(Context ctx) {
+        try {
+            double[] ll = locate(ctx);
+            if (ll == null) {
+                dbg(ctx, "weather: no location");
+                return null;
+            }
+            String where = String.format(java.util.Locale.US, "%.2f,%.2f", ll[0], ll[1]);
+            String resp = http(ctx, "https://wttr.in/" + where + "?format=j1", null, null, null);
+            if (resp == null) {
+                dbg(ctx, "weather: wttr.in unreachable");
+                return null;
+            }
+            JSONObject now = new JSONObject(resp).getJSONArray("current_condition").getJSONObject(0);
+            double t = now.optDouble("temp_C", Double.NaN);
+            if (Double.isNaN(t)) return null;
+            dbg(ctx, "weather from wttr.in: " + Math.round(t) + "deg code="
+                    + now.optString("weatherCode"));
+            return new Reading((int) Math.round(t), conditionResWwo(now.optInt("weatherCode", -1)));
+        } catch (Exception e) {
+            dbg(ctx, "weather: wttr.in failed " + e);
+            return null;
+        }
+    }
+
+    /**
+     * Open-Meteo, the keyless fallback for the networks wttr.in cannot be had from: a blend of
+     * the national weather models (the same data the consumer apps show), free for any use, no
+     * key and no registration to keep alive.
      */
     private static Reading openMeteo(Context ctx) {
         try {
@@ -121,7 +207,7 @@ final class Weather {
             String url = "https://api.open-meteo.com/v1/forecast?latitude=" + ll[0]
                     + "&longitude=" + ll[1]
                     + "&current=temperature_2m,weather_code&timezone=auto";
-            String resp = http(url, null, null);
+            String resp = http(ctx, url, null, null, null);
             if (resp == null) {
                 dbg(ctx, "weather: open-meteo unreachable");
                 return null;
@@ -159,10 +245,22 @@ final class Weather {
         } catch (Exception ignored) {
         }
         try {
-            // The IP lookup is a third-party call: reuse its answer for a day before asking again.
+            // The IP lookup is a third-party call: the answer is kept for good (see cachedCoords).
             double[] cached = cachedCoords(ctx);
             if (cached != null) return cached;
-            String resp = http("https://ipapi.co/json/", null, null);
+            // ipwho.is first: free, HTTPS, no key, and reachable where ipapi.co is not.
+            String resp = http(ctx, "https://ipwho.is/", null, null, null);
+            if (resp != null) {
+                JSONObject o = new JSONObject(resp);
+                if (o.optBoolean("success", false)) {
+                    double[] out = new double[]{o.getDouble("latitude"), o.getDouble("longitude")};
+                    rememberCoords(ctx, out);
+                    return out;
+                }
+                dbg(ctx, "weather: ipwho.is answered success=" + o.optBoolean("success"));
+            }
+            // ipapi.co stays as the fallback for the day ipwho.is goes away.
+            resp = http(ctx, "https://ipapi.co/json/", null, null, null);
             if (resp == null) return null;
             JSONObject o = new JSONObject(resp);
             double[] out = new double[]{o.getDouble("latitude"), o.getDouble("longitude")};
@@ -174,16 +272,16 @@ final class Weather {
     }
 
     /** Where the IP lookup landed, so a TV without a location fix does not phone ipapi.co on
-     *  every refresh: the fallback coordinates are reused for a day, then re-asked once. */
+     *  every refresh. The answer is kept for good: a TV does not move, and a re-ask on a timer
+     *  would turn one failed lookup into permanent weather loss — with no GPS fix to fall
+     *  back to, the slide would never come back until the lookup happened to succeed again. */
     private static final String COORDS_PREF = "weather_ip_coords";
-    private static final long COORDS_TTL_MS = 24 * 60 * 60 * 1000L;
 
     private static double[] cachedCoords(Context ctx) {
         try {
             android.content.SharedPreferences p =
                     ctx.getSharedPreferences(COORDS_PREF, Context.MODE_PRIVATE);
-            long at = p.getLong("at", 0);
-            if (System.currentTimeMillis() - at > COORDS_TTL_MS) return null;
+            if (p.getLong("at", 0) == 0) return null;
             double lat = Double.longBitsToDouble(p.getLong("lat", 0));
             double lon = Double.longBitsToDouble(p.getLong("lon", 0));
             if (lat == 0 && lon == 0) return null;
@@ -204,13 +302,16 @@ final class Weather {
         }
     }
 
-    /** One helper for both calls: POST with a body and the key header, or GET without either. */
-    private static String http(String url, String body, String key) {
+    /** One helper for both calls: POST with a body and the key header, or GET without either.
+     *  The timeouts are long on purpose (wttr.in can think for tens of seconds), the fetches
+     *  always run off the UI thread. Failures are logged with their reason when debuggable. */
+    private static String http(Context ctx, String url, String body, String key, String ua) {
         HttpURLConnection c = null;
         try {
             c = (HttpURLConnection) new URL(url).openConnection();
-            c.setConnectTimeout(10_000);
-            c.setReadTimeout(10_000);
+            c.setConnectTimeout(20_000);
+            c.setReadTimeout(20_000);
+            if (ua != null) c.setRequestProperty("User-Agent", ua);
             if (key != null) c.setRequestProperty("X-Yandex-Weather-Key", key);
             if (body != null) {
                 c.setRequestMethod("POST");
@@ -218,7 +319,11 @@ final class Weather {
                 c.setRequestProperty("Content-Type", "application/json");
                 c.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
             }
-            if (c.getResponseCode() != HttpURLConnection.HTTP_OK) return null;
+            int code = c.getResponseCode();
+            if (code != HttpURLConnection.HTTP_OK) {
+                dbg(ctx, "http: " + url + " -> " + code);
+                return null;
+            }
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             try (InputStream in = c.getInputStream()) {
                 byte[] buf = new byte[4096];
@@ -229,9 +334,99 @@ final class Weather {
             }
             return new String(out.toByteArray(), StandardCharsets.UTF_8);
         } catch (Exception e) {
+            dbg(ctx, "http: " + url + " failed " + e);
             return null;
         } finally {
             if (c != null) c.disconnect();
+        }
+    }
+
+    /** MET Norway's symbol codes ("lightrainshowers_day") to the conditions the slide knows. */
+    private static int conditionResMetNo(String symbol) {
+        if (symbol == null || symbol.isEmpty()) return 0;
+        if (symbol.contains("thunder")) {
+            if (symbol.contains("hail")) return R.string.condition_thunderstorm_with_hail;
+            return R.string.condition_thunderstorm_with_rain;
+        }
+        // The time-of-day tail ("_day", "_night", "_polartwilight") carries no weather of its own.
+        int cut = symbol.indexOf('_');
+        String base = cut >= 0 ? symbol.substring(0, cut) : symbol;
+        switch (base) {
+            case "clearsky": return R.string.condition_clear;
+            case "fair":
+            case "partlycloudy": return R.string.condition_partly_cloudy;
+            case "cloudy": return R.string.condition_cloudy;
+            case "overcast": return R.string.condition_overcast;
+            case "fog": return R.string.condition_fog;
+            case "drizzle":
+            case "lightrain":
+            case "lightrainshowers": return R.string.condition_light_rain;
+            case "rain": return R.string.condition_rain;
+            case "rainshowers": return R.string.condition_showers;
+            case "heavyrain":
+            case "heavyrainshowers": return R.string.condition_heavy_rain;
+            case "lightsnow":
+            case "lightsnowshowers": return R.string.condition_light_snow;
+            case "snow":
+            case "heavysnow": return R.string.condition_snow;
+            case "snowshowers": return R.string.condition_snow_showers;
+            case "sleet":
+            case "lightsleet":
+            case "heavysleet":
+            case "lightsleetshowers":
+            case "heavysleetshowers": return R.string.condition_wet_snow;
+            default: return 0;
+        }
+    }
+
+    /** wttr.in's WWO weather codes to the same conditions the slide knows. */
+    private static int conditionResWwo(int code) {
+        switch (code) {
+            case 113: return R.string.condition_clear;
+            case 116: return R.string.condition_partly_cloudy;
+            case 119: return R.string.condition_cloudy;
+            case 122: return R.string.condition_overcast;
+            case 143:
+            case 248:
+            case 260: return R.string.condition_fog;
+            case 176:
+            case 263:
+            case 266:
+            case 281:
+            case 293:
+            case 296: return R.string.condition_light_rain;
+            case 299:
+            case 302:
+            case 311:
+            case 314: return R.string.condition_rain;
+            case 305:
+            case 308:
+            case 353:
+            case 356:
+            case 359: return R.string.condition_heavy_rain;
+            case 200:
+            case 386:
+            case 389: return R.string.condition_thunderstorm;
+            case 179:
+            case 323:
+            case 326:
+            case 368: return R.string.condition_light_snow;
+            case 182:
+            case 185:
+            case 317:
+            case 320:
+            case 350:
+            case 362:
+            case 365:
+            case 374:
+            case 377: return R.string.condition_wet_snow;
+            case 227:
+            case 230:
+            case 329:
+            case 332:
+            case 335:
+            case 371: return R.string.condition_snow;
+            default: return 0;
         }
     }
 

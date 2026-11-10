@@ -15,7 +15,6 @@
         android:id="@+id/empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
         android:gravity="center"
         android:padding="32dp"
         android:text="@string/no_module_cards"

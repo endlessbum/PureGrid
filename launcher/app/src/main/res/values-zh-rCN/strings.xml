@@ -5,12 +5,11 @@
     <string name="input">输入</string>
     <string name="wifi">无线网络</string>
     <string name="settings">设置</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">清理</string>
+    <string name="search">搜索</string>
     <string name="search_section_apps">应用</string>
     <string name="search_empty">未找到结果</string>
     <string name="search_no_content_hint">已安装的应用未提供可搜索的内容</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="home_settings">选择默认桌面</string>
     <string name="home_settings_help">选择原始桌面即可关闭简洁桌面的默认桌面状态；需要切回时选择简洁桌面。原始桌面必须仍处于启用状态；若安装脚本已停用它，请先用恢复脚本启用。电视还须提供系统桌面选择页。</string>
     <string name="launcher_settings">简洁桌面设置</string>
@@ -22,9 +21,7 @@
     <string name="on">开</string>
     <string name="off">关</string>
     <string name="choose_input">输入源</string>
-    <string name="connected">已连接</string>
-    <string name="standby">待机</string>
-    <string name="not_connected">未连接</string>
+    <string name="not_connected">无设备</string>
     <string name="live_tv">电视直播</string>
     <string name="no_inputs">未找到输入源</string>
     <string name="good_morning">早上好</string>
@@ -61,7 +58,6 @@
     <string name="cleaned">清理完成</string>
     <string name="cleaning_started">已开始清理</string>
     <string name="cleaning_unavailable">在 Android 14 及更高版本上，系统不允许桌面结束其他应用的后台进程</string>
-    <string name="cleared_apps">已关闭 %1$d 个应用</string>
     <string name="vpn">VPN</string>
     <string name="dock_editor_settings">Dock 设置</string>
     <string name="dock_editor_hide_below">隐藏 Dock 下方的应用</string>
@@ -75,8 +71,8 @@
     <string name="weather_state">天气：%1$s</string>
     <string name="section_inputs">「输入」菜单</string>
     <string name="hdmi_only_state">仅显示 HDMI：%1$s</string>
-    <string name="clear_button_state">隐藏 Clear 按钮：%1$s</string>
-    <string name="search_button_state">隐藏 Search 按钮：%1$s</string>
+    <string name="clear_button_state">隐藏 清理 按钮：%1$s</string>
+    <string name="search_button_state">隐藏 搜索 按钮：%1$s</string>
     <string name="account_button_state">隐藏 Google 账号按钮：%1$s</string>
     <string name="done">完成</string>
     <string name="settings_subtitle">强调色、布局与动效</string>
@@ -117,7 +113,7 @@
     <string name="no_module_cards">未安装任何模块卡片</string>
     <string name="card_app_name">应用：%1$s</string>
     <string name="card_state_shown">已显示</string>
-    <string name="card_state_over_limit">已显示，超出 8 个的上限</string>
+    <string name="card_state_over_limit">已启用，超出 8 个的上限（未显示）</string>
     <string name="card_state_hidden">已隐藏</string>
     <string name="card_state_new">新增</string>
     <string name="card_state_new_key">新密钥</string>

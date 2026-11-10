@@ -45,6 +45,9 @@ final class Config {
     final int columns;
     final boolean animations;
     final boolean advancedEffects;
+    /** Advanced effects (hero cross-fade, ambient tint) need animations on at all; MainActivity and
+     *  AppAdapter must derive this identically, so it is computed once here. */
+    final boolean heroEffects;
     final int rowsBelowDock;
     final boolean shamsiDate;
     final boolean moduleCards;
@@ -87,6 +90,7 @@ final class Config {
         this.rowsBelowDock = rowsBelowDock;
         this.animations = animations;
         this.advancedEffects = advancedEffects;
+        this.heroEffects = animations && advancedEffects;
         this.shamsiDate = shamsiDate;
         this.moduleCards = moduleCards;
         this.reducedMotion = reducedMotion;

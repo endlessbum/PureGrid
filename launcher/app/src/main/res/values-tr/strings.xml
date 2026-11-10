@@ -5,15 +5,12 @@
     <string name="input">Giriş</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">Ayarlar</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">Temizle</string>
+    <string name="search">Ara</string>
     <string name="search_section_apps">Uygulamalar</string>
     <string name="search_empty">Hiçbir şey bulunamadı</string>
     <string name="search_no_content_hint">Yüklü uygulamalar arama için içerik sunmuyor</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="choose_input">Girişler</string>
-    <string name="connected">Bağlı</string>
-    <string name="standby">Bekleme</string>
     <string name="not_connected">Cihaz Yok</string>
     <string name="live_tv">Canlı TV</string>
     <string name="no_inputs">Giriş Bulunamadı</string>
@@ -47,7 +44,7 @@
     <string name="no_module_cards">Yüklü modül kartı yok</string>
     <string name="card_app_name">Uygulama: %1$s</string>
     <string name="card_state_shown">Gösteriliyor</string>
-    <string name="card_state_over_limit">Gösteriliyor, 8 sınırının üzerinde</string>
+    <string name="card_state_over_limit">Açık, 8 sınırının üzerinde (gösterilmiyor)</string>
     <string name="card_state_hidden">Gizli</string>
     <string name="card_state_new">Yeni</string>
     <string name="card_state_new_key">Yeni anahtar</string>
@@ -84,7 +81,6 @@
     <string name="cleaned">Temizleme tamamlandı</string>
     <string name="cleaning_started">Temizleme başlatıldı</string>
     <string name="cleaning_unavailable">Android 14 ve sonrasında sistem, bir başlatıcının diğer uygulamaların arka plan işlemlerini sonlandırmasına izin vermez</string>
-    <string name="cleared_apps">%1$d uygulama kapatıldı</string>
     <string name="dock_editor_settings">Dock ayarları</string>
     <string name="dock_editor_hide_below">Dock altındaki uygulamaları gizle</string>
     <string name="dock_editor_apply">Uygula</string>
@@ -97,8 +93,8 @@
     <string name="weather_state">Hava durumu: %1$s</string>
     <string name="section_inputs">Menü «Girişler»</string>
     <string name="hdmi_only_state">Yalnızca HDMI: %1$s</string>
-    <string name="clear_button_state">Clear düğmesini gizle: %1$s</string>
-    <string name="search_button_state">Search düğmesini gizle: %1$s</string>
+    <string name="clear_button_state">Temizle düğmesini gizle: %1$s</string>
+    <string name="search_button_state">Ara düğmesini gizle: %1$s</string>
     <string name="account_button_state">Google hesabı düğmesini gizle: %1$s</string>
     <string name="done">Tamam</string>
     <string name="settings_subtitle">Vurgu, düzen ve hareket</string>

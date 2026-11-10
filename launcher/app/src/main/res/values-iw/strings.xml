@@ -5,15 +5,12 @@
     <string name="input">כניסה</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">הגדרות</string>
-    <string name="clear">Clear</string>
-    <string name="search">Search</string>
+    <string name="clear">ניקוי</string>
+    <string name="search">חיפוש</string>
     <string name="search_section_apps">אפליקציות</string>
     <string name="search_empty">לא נמצא דבר</string>
     <string name="search_no_content_hint">האפליקציות המותקנות לא מספקות תוכן לחיפוש</string>
-    <string name="cleared_mb">Freed %1$d MB</string>
     <string name="choose_input">כניסות</string>
-    <string name="connected">מחובר</string>
-    <string name="standby">בהמתנה</string>
     <string name="not_connected">אין מכשיר</string>
     <string name="live_tv">שידור חי</string>
     <string name="no_inputs">לא נמצאו כניסות</string>
@@ -47,7 +44,7 @@
     <string name="no_module_cards">לא מותקנים כרטיסי הרחבות</string>
     <string name="card_app_name">אפליקציה: %1$s</string>
     <string name="card_state_shown">מוצג</string>
-    <string name="card_state_over_limit">מוצג, מעבר למגבלה של 8</string>
+    <string name="card_state_over_limit">מופעל, מעבר למגבלה של 8 (לא מוצג)</string>
     <string name="card_state_hidden">מוסתר</string>
     <string name="card_state_new">חדש</string>
     <string name="card_state_new_key">מפתח חדש</string>
@@ -78,7 +75,6 @@
     <string name="cleaned">הניקוי הושלם</string>
     <string name="cleaning_started">הניקוי התחיל</string>
     <string name="cleaning_unavailable">ב-Android 14 וגרסאות חדשות יותר המערכת אינה מאפשרת ללנצ\'ר לסיים תהליכי רקע של אפליקציות אחרות</string>
-    <string name="cleared_apps">נסגרו %1$d אפליקציות</string>
     <string name="launcher_settings">הגדרות לנצ\'ר</string>
     <string name="dock_editor_settings">הגדרות ה-Dock</string>
     <string name="dock_editor_hide_below">הסתרת אפליקציות מתחת ל-Dock</string>
@@ -97,8 +93,8 @@
     <string name="follow_theme">פעל לפי ערכת העיצוב (איפוס הבחירות שבוצעו בטלוויזיה)</string>
     <string name="follow_theme_hint">משתמש בערכת העיצוב הנוכחית או בהגדרות הפריסה וההנפשה המובנות. דחיפה או איפוס של ערכת עיצוב מנקים גם את הבחירות שבוצעו בטלוויזיה.</string>
     <string name="tv_settings">הגדרות המערכת של הטלוויזיה</string>
-    <string name="clear_button_state">הסתרת כפתור ה-Clear: %1$s</string>
-    <string name="search_button_state">הסתרת כפתור ה-Search: %1$s</string>
+    <string name="clear_button_state">הסתרת כפתור ה-ניקוי: %1$s</string>
+    <string name="search_button_state">הסתרת כפתור ה-חיפוש: %1$s</string>
     <string name="account_button_state">הסתרת כפתור חשבון Google: %1$s</string>
     <string name="done">בוצע</string>
     <string name="settings_subtitle">הדגשה, פריסה והנפשה</string>

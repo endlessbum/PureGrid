@@ -24,6 +24,7 @@ final class VpnBadge extends ReplacementSpan {
     static final int OFF = 2;
 
     private static final int GREEN = 0xFF30D158;
+    /** Mirrors res/values/colors.xml warn_amber (the network pill's no-access tint). */
     private static final int AMBER = 0xFFFF9F0A;
     private static final int WHITE = 0xFFFFFFFF;
     private static final int INK = 0xFF06290F;

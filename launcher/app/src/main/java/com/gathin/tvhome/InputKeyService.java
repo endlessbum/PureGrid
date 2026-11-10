@@ -19,7 +19,9 @@ public class InputKeyService extends AccessibilityService {
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
         if (event.getKeyCode() != KeyEvent.KEYCODE_TV) return false;
-        if (event.getAction() == KeyEvent.ACTION_UP) {
+        // A canceled key-up (another window intercepted the press) must not pop the switcher —
+        // the same guard HomeKeyService applies to every ACTION_UP it acts on.
+        if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
             try {
                 startActivity(new Intent(ACTION_VIEW_INPUTS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } catch (ActivityNotFoundException ignored) {
