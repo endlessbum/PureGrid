@@ -36,7 +36,7 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
-            <category android:name="com.gathin.tvhome.category.DOCK_CARD" />
+            <category android:name="tv.puregrid.launcher.category.DOCK_CARD" />
         </intent>
         <!-- Content search: video apps that export a search-suggestions provider (the Leanback
              global-search protocol) are enumerated and queried by SearchActivity, so the search
@@ -115,7 +115,7 @@
         </service>
 
         <!-- Screensaver: pick it in Settings, or `settings put secure screensaver_components
-             com.gathin.tvhome/.ClockDream` over adb. -->
+             tv.puregrid.launcher/.ClockDream` over adb. -->
         <service
             android:name=".ClockDream"
             android:label="@string/dream_name"

@@ -29,7 +29,7 @@ if [ -z "${STOCK_LAUNCHER:-}" ]; then
   case " $KNOWN_STOCK_LAUNCHERS " in
     *" $HOME_PKG "*) STOCK_LAUNCHER=$HOME_PKG ;;
     *)
-      if [ "$HOME_PKG" = com.gathin.tvhome ]; then
+      if [ "$HOME_PKG" = tv.puregrid.launcher ]; then
         STOCK_LAUNCHER=none; echo "Home already belongs to this launcher; nothing will be disabled."
       elif [ "$HOME_PKG" = android ]; then
         # Android's chooser: two or more launchers tie and no default is set, which is where a TV lands
@@ -84,7 +84,7 @@ esac
 # the home preference whenever the set of HOME apps changes, so setting it while the stock launcher
 # is still enabled narrows the window where no default exists. A failure here is fatal: the batch
 # below would disable the stock launcher with no working Home to fall back to.
-SET_OUT=$("$PY" -I ../tools/tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity')
+SET_OUT=$("$PY" -I ../tools/tv.py 'cmd package set-home-activity --user 0 tv.puregrid.launcher/.MainActivity')
 echo "$SET_OUT"
 case "$SET_OUT" in
   *Error*) echo "ERROR: could not set the new launcher as home; the stock launcher was left untouched." >&2; exit 1 ;;
@@ -93,7 +93,7 @@ esac
 # fails only prints an "Error:" line, and the stock launcher would be disabled anyway, leaving the TV
 # with no usable Home (#239). "Status: ok" from `am start -W` means the activity really came up;
 # the HOME resolution further down only names a component, it does not prove the activity starts.
-START_OUT=$("$PY" -I ../tools/tv.py 'am start -W -n com.gathin.tvhome/.MainActivity')
+START_OUT=$("$PY" -I ../tools/tv.py 'am start -W -n tv.puregrid.launcher/.MainActivity')
 echo "$START_OUT"
 # Both halves matter: some builds answer "Status: ok" for a task that was merely brought to the
 # front, and an activity that cannot start still prints "Error: Activity not started".
@@ -102,13 +102,13 @@ if ! printf '%s' "$START_OUT" | grep -qF 'Status: ok' || printf '%s' "$START_OUT
   exit 1
 fi
 BATCH_OUT=$(printf '%s\n' \
-  "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null && echo location-granted || echo location-grant-failed" \
-  "pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS 2>/dev/null && echo secure-granted || echo secure-grant-failed" \
-  "pm grant com.gathin.tvhome android.permission.GET_ACCOUNTS 2>/dev/null && echo account-granted || echo account-grant-failed" \
-  "pm grant com.gathin.tvhome android.permission.READ_CONTACTS 2>/dev/null && echo contacts-granted || echo contacts-grant-failed" \
-  "cmd package compile -m speed -f com.gathin.tvhome" \
+  "pm grant tv.puregrid.launcher android.permission.ACCESS_FINE_LOCATION 2>/dev/null && echo location-granted || echo location-grant-failed" \
+  "pm grant tv.puregrid.launcher android.permission.WRITE_SECURE_SETTINGS 2>/dev/null && echo secure-granted || echo secure-grant-failed" \
+  "pm grant tv.puregrid.launcher android.permission.GET_ACCOUNTS 2>/dev/null && echo account-granted || echo account-grant-failed" \
+  "pm grant tv.puregrid.launcher android.permission.READ_CONTACTS 2>/dev/null && echo contacts-granted || echo contacts-grant-failed" \
+  "cmd package compile -m speed -f tv.puregrid.launcher" \
   "$DISABLE_STOCK" \
-  "cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity" \
+  "cmd package set-home-activity --user 0 tv.puregrid.launcher/.MainActivity" \
   | "$PY" -I ../tools/tv.py --batch || true)
 echo "$BATCH_OUT"
 # A marker must match as a whole output line: the batch also echoes the command itself, whose
@@ -163,7 +163,7 @@ rollback_home() {
 # stock launcher back if it is not ours.
 HOME_NOW=$(query_home)
 case "$HOME_NOW" in
-  com.gathin.tvhome/*) echo "Home now resolves to $HOME_NOW" ;;
+  tv.puregrid.launcher/*) echo "Home now resolves to $HOME_NOW" ;;
   *)
     if [ -z "$HOME_NOW" ]; then
       echo "ERROR: the TV stopped answering while Home was being switched, so the outcome is unknown." >&2
@@ -185,7 +185,7 @@ esac
 #   HOME_KEY_SERVICE=1    remotes whose Home button sends KEYCODE_ALL_APPS instead of HOME, e.g. Xiaomi
 #                         sticks: the key is routed to the launcher (HomeKeyService)
 enable_service() {   # appends to enabled_accessibility_services without dropping other services
-  svc=com.gathin.tvhome/.$1
+  svc=tv.puregrid.launcher/.$1
   "$PY" -I ../tools/tv.py "s=\$(settings get secure enabled_accessibility_services); case \"\$s\" in *$1*) ;; null|'') settings put secure enabled_accessibility_services $svc ;; *) settings put secure enabled_accessibility_services \"\$s:$svc\" ;; esac; settings put secure accessibility_enabled 1; echo $1 enabled"
 }
 if [ "${INPUT_KEY_SERVICE:-0}" = 1 ]; then enable_service InputKeyService; fi

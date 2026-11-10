@@ -42,7 +42,7 @@ if (-not $StockLauncher) {
     if ($LASTEXITCODE -ne 0 -or -not $homePkg) { throw 'could not ask the TV which launcher owns Home; check -TvHost and the debugging prompt, or pass -StockLauncher <package>' }
     $homePkg = "$homePkg".Trim().Split('/')[0]
     if ($knownStock -contains $homePkg) { $StockLauncher = $homePkg }
-    elseif ($homePkg -eq 'com.gathin.tvhome') { $StockLauncher = 'none'; Write-Host 'Home already belongs to this launcher; nothing will be disabled.' }
+    elseif ($homePkg -eq 'tv.puregrid.launcher') { $StockLauncher = 'none'; Write-Host 'Home already belongs to this launcher; nothing will be disabled.' }
     elseif ($homePkg -eq 'android') {
         # Android's chooser: launchers tie and no default is set (a restore followed by a re-applied list
         # ends here). Take the one known stock launcher among the HOME claimants, if there is exactly one.
@@ -69,22 +69,22 @@ $out = & $py -I ..\tools\tv.py 'pm install -r /data/local/tmp/tvhome.apk; rm -f 
 Write-Host $out
 if ("$out" -notmatch 'Success') { throw 'pm install failed; the stock launcher was left untouched' }
 # Android 9 only accepts a component here; Android 10+ also takes a bare package name.
-$out = & $py -I ..\tools\tv.py 'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
+$out = & $py -I ..\tools\tv.py 'cmd package set-home-activity --user 0 tv.puregrid.launcher/.MainActivity'
 Write-Host $out
 if ("$out" -match 'Error') { throw 'could not set the new launcher as home; the stock launcher was left untouched' }
 # Start the launcher on its own, before the stock Home is touched (see build-and-install.sh, #239):
 # in the batch a failed start only prints an Error line and the stock launcher would be disabled anyway.
-$start = (& $py -I ..\tools\tv.py 'am start -W -n com.gathin.tvhome/.MainActivity') -join "`n"
+$start = (& $py -I ..\tools\tv.py 'am start -W -n tv.puregrid.launcher/.MainActivity') -join "`n"
 Write-Host $start
 if ($start -notmatch 'Status: ok' -or $start -match '(?m)^Error') { throw "the new launcher did not start (see above); $StockLauncher was left enabled" }
 $batchOut = @(
-    'pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null && echo location-granted || echo location-grant-failed',
-    'pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS 2>/dev/null && echo secure-granted || echo secure-grant-failed',
-    'pm grant com.gathin.tvhome android.permission.GET_ACCOUNTS 2>/dev/null && echo account-granted || echo account-grant-failed',
-    'pm grant com.gathin.tvhome android.permission.READ_CONTACTS 2>/dev/null && echo contacts-granted || echo contacts-grant-failed',
-    'cmd package compile -m speed -f com.gathin.tvhome',
+    'pm grant tv.puregrid.launcher android.permission.ACCESS_FINE_LOCATION 2>/dev/null && echo location-granted || echo location-grant-failed',
+    'pm grant tv.puregrid.launcher android.permission.WRITE_SECURE_SETTINGS 2>/dev/null && echo secure-granted || echo secure-grant-failed',
+    'pm grant tv.puregrid.launcher android.permission.GET_ACCOUNTS 2>/dev/null && echo account-granted || echo account-grant-failed',
+    'pm grant tv.puregrid.launcher android.permission.READ_CONTACTS 2>/dev/null && echo contacts-granted || echo contacts-grant-failed',
+    'cmd package compile -m speed -f tv.puregrid.launcher',
     $disableStock,
-    'cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity'
+    'cmd package set-home-activity --user 0 tv.puregrid.launcher/.MainActivity'
 ) | & $py -I ..\tools\tv.py --batch
 $batchOut | Write-Host
 if ($LASTEXITCODE -ne 0) { Write-Host 'WARNING: the connection dropped during the batch; the switch may be half-done — checking and rolling back below.' -ForegroundColor Yellow }
@@ -102,7 +102,7 @@ if ($failedGrants.Count -gt 0) {
 # preference last, then check where Home ended up and put the stock launcher back if it is not ours.
 # Empty output means "the TV stopped answering", not "no Home": the branches below tell the two apart.
 $homeNow = ((& $py -I ..\tools\tv.py 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME' 2>$null | Select-Object -Last 1) -as [string]).Trim()
-if ($homeNow -ne 'com.gathin.tvhome' -and -not $homeNow.StartsWith('com.gathin.tvhome/')) {
+if ($homeNow -ne 'tv.puregrid.launcher' -and -not $homeNow.StartsWith('tv.puregrid.launcher/')) {
     # Put the stock launcher back and check that it took. A TV whose new Home does not start can only
     # be rescued over ADB, so the commands also go into a local file: when it is the connection that
     # broke, the terminal that ran this script may never come back.
@@ -135,7 +135,7 @@ if ($homeNow -ne 'com.gathin.tvhome' -and -not $homeNow.StartsWith('com.gathin.t
 Write-Host "Home now resolves to $homeNow"
 # Optional accessibility services, appended to enabled_accessibility_services without dropping others.
 function Enable-Service([string]$Name) {
-    $svc = "com.gathin.tvhome/.$Name"
+    $svc = "tv.puregrid.launcher/.$Name"
     & $py -I ..\tools\tv.py ('s=$(settings get secure enabled_accessibility_services); case "$s" in *' + $Name + '*) ;; null|"") settings put secure enabled_accessibility_services ' + $svc + ' ;; *) settings put secure enabled_accessibility_services "$s:' + $svc + '" ;; esac; settings put secure accessibility_enabled 1; echo ' + $Name + ' enabled')
 }
 if ($InputKeyService) { Enable-Service 'InputKeyService' }

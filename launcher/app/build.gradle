@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.gathin.tvhome'
+    namespace 'tv.puregrid.launcher'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.gathin.tvhome'
+        applicationId 'tv.puregrid.launcher'
         minSdk 26
         targetSdk 34
         versionCode 5
@@ -41,6 +41,9 @@ dependencies {
     // with ClassNotFoundException while the classes themselves are fine. Run the suite from an
     // ASCII-only path, or from an IDE.
     testImplementation 'junit:junit:4.13.2'
+    // The real org.json for the JVM tests: android.jar only ships stubs that throw, while the
+    // weather parsers and Config's overlay reader are written against org.json. Test only.
+    testImplementation 'org.json:json:20240303'
     // Instrumentation tests (src/androidTest): run on the TV itself via connectedDebugAndroidTest.
     // Test only (never in the APK).
     androidTestImplementation 'androidx.test:core:1.6.1'

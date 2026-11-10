@@ -1,6 +1,6 @@
 # PureGrid
 
-PureGrid (`com.gathin.tvhome`) — лаунчер для Android TV и Google TV: главный экран без рекламных
+PureGrid (`tv.puregrid.launcher`) — лаунчер для Android TV и Google TV: главный экран без рекламных
 строк, док из избранных приложений, сетка остальных, поиск, погода, темы — плюс инструменты
 debloat, которые через ADB отключают встроенный «мусор» прошивки. Ничего не перепрошивается и не
 удаляется: пакеты только отключаются, и всё возвращается одной командой.
@@ -124,15 +124,15 @@ TV_HOST=192.168.1.50 tools/tv.py 'settings put secure yandex_weather_key <клю
    Без `adb`: `tools/b64push.py app/build/outputs/apk/release/app-release.apk /data/local/tmp/tvhome.apk`,
    затем `tools/tv.py 'pm install -r /data/local/tmp/tvhome.apk'`.
 3. Запустить и проверить, что лаунчер стартовал:
-   `adb shell am start -W -n com.gathin.tvhome/.MainActivity`.
+   `adb shell am start -W -n tv.puregrid.launcher/.MainActivity`.
 4. Выдать разрешения (нужны сети, настройкам, аккаунту и карточкам):
    ```bash
-   adb shell pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION
-   adb shell pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS
-   adb shell pm grant com.gathin.tvhome android.permission.GET_ACCOUNTS
-   adb shell pm grant com.gathin.tvhome android.permission.READ_CONTACTS
+   adb shell pm grant tv.puregrid.launcher android.permission.ACCESS_FINE_LOCATION
+   adb shell pm grant tv.puregrid.launcher android.permission.WRITE_SECURE_SETTINGS
+   adb shell pm grant tv.puregrid.launcher android.permission.GET_ACCOUNTS
+   adb shell pm grant tv.puregrid.launcher android.permission.READ_CONTACTS
    ```
-5. Назначить Home: `adb shell cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity`.
+5. Назначить Home: `adb shell cmd package set-home-activity --user 0 tv.puregrid.launcher/.MainActivity`.
 6. Убедиться, что новый лаунчер действительно работает и держит Home (шаги 3 и 5), и только
    потом отключить стоковый: `adb shell pm disable-user --user 0 <имя пакета стокового лаунчера>`.
    На Android TV это обычно `com.google.android.tvlauncher`, на новых Google TV —
@@ -239,7 +239,7 @@ launcher\build-and-install.ps1 -TvHost <ip> -InputKeyService -HomeKeyService
 В системных настройках телевизора выберите заставку **Clock** либо назначьте её командой:
 
 ```bash
-adb shell settings put secure screensaver_components com.gathin.tvhome/.ClockDream
+adb shell settings put secure screensaver_components tv.puregrid.launcher/.ClockDream
 ```
 
 Часы раз в минуту меняют положение и оттенок свечения, чтобы не выжигать матрицу.
@@ -251,7 +251,7 @@ adb shell settings put secure screensaver_components com.gathin.tvhome/.ClockDre
 и португальский. На Android 13+ язык можно задать только для лаунчера:
 
 ```bash
-adb shell cmd locale set-app-locales com.gathin.tvhome --user 0 --locales ru-RU
+adb shell cmd locale set-app-locales tv.puregrid.launcher --user 0 --locales ru-RU
 ```
 
 На более старых версиях лаунчер следует системному языку.

@@ -18,7 +18,7 @@ if ($Theme) { $Theme = (Resolve-Path $Theme).Path }
 Set-Location $PSScriptRoot
 $py = 'venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
-$pkg = 'com.gathin.tvhome'
+$pkg = 'tv.puregrid.launcher'
 $dir = "/sdcard/Android/data/$pkg/files"
 $revision = [guid]::NewGuid().ToString('N')
 # Restart Home so it rereads the theme. Android drops a force-stopped app's accessibility services from the
